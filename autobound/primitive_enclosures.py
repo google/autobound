@@ -1,0 +1,286 @@
+# Copyright 2022 The autobound Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""A library of Taylor enclosures for various primitive functions."""
+
+import functools
+import math
+from typing import Callable, Sequence, Tuple
+
+# pylint: disable=g-multiple-import
+from autobound.types import (
+    Interval, NumpyLike, ElementwiseTaylorEnclosure, NDArray, NDArrayLike)
+
+
+def abs_enclosure(x0: NDArray,
+                  unused_trust_region: Interval,
+                  degree: int,
+                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns an ElementwiseTaylorEnclosure for abs(x) in terms of x-x0."""
+  if degree >= 1:
+    return ElementwiseTaylorEnclosure(
+        (np_like.abs(x0), (-np_like.ones_like(x0), np_like.ones_like(x0))))
+  else:
+    raise NotImplementedError(degree)
+
+
+def exp_enclosure(x0: NDArray,
+                  trust_region: Interval,
+                  degree: int,
+                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns an ElementwiseTaylorEnclosure for exp(x) in terms of x-x0."""
+  exp_x0 = np_like.exp(x0)
+  taylor_coefficients_at_x0 = []
+  i_factorial = 1
+  for i in range(degree + 1):
+    if i > 0:
+      i_factorial *= i
+    taylor_coefficients_at_x0.append(exp_x0 / i_factorial)
+  return sharp_enclosure_monotonic_derivative(
+      x0, degree, trust_region, np_like.exp, taylor_coefficients_at_x0, True,
+      np_like)
+
+
+def log_enclosure(x0: NDArray,
+                  trust_region: Interval,
+                  degree: int,
+                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns an ElementwiseTaylorEnclosure for log(x) in terms of x-x0."""
+  # Derivatives of log(x) are:
+  # x**-1, -x**-2, 2x**-3, -6x**-4, ...
+  # ith derivative is (-1)**(i+1) (i-1)! x**-i.
+  # ith coefficient of Taylor polynomial is (-1)**i+1 x**-i / i.
+  # ith derivative is increasing if i is even, decreasing otherwise.
+  taylor_coefficients_at_x0 = [np_like.log(x0)]
+  for i in range(1, degree + 1):
+    taylor_coefficients_at_x0.append((-1 if i % 2 == 0 else 1) * x0**-i / i)
+  increasing = degree % 2 == 0
+  return sharp_enclosure_monotonic_derivative(
+      x0, degree, trust_region, np_like.log, taylor_coefficients_at_x0,
+      increasing, np_like)
+
+
+def pow_enclosure(exponent: float,
+                  x0: NDArray,
+                  trust_region: Interval,
+                  degree: int,
+                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns an ElementwiseTaylorEnclosure for x**exponent in terms of x-x0."""
+  # The kth derivative of x**p is p * (p-1) * ... * (p-k) * x0**(p-k)
+  taylor_coefficients_at_x0 = []
+  c = 1.
+  i_factorial = 1.
+  for i in range(degree + 1):
+    if i > 0:
+      i_factorial *= i
+    # Note: the next line can sometimes generate bogus RuntimeWarnings when
+    # using Numpy.  This seems to be a bug in Numpy, as even doing
+    # np.array(2.)**-1 generates the same RuntimeWarning.
+    taylor_coefficients_at_x0.append(c * x0**(exponent - i) / i_factorial)
+    if i < degree:
+      c *= exponent - i
+
+  # Compute sharp enclosures for two cases: x-x0 > 0 (enc_pos below), and
+  # x-x0 < 0 (enc_neg below).
+  #
+  # The kth derivative of x**p at x is c*x**(p-k), where c
+  # is negative if k is odd, and positive if k is even.
+  # For x > 0, c*x**(p-k) is decreasing if c is positive, and
+  # decreasing otherwise.
+  # For x < 0 and even p-k, the situation is the same.
+  # For x < 0 and odd p-k, the situation is reversed: c*x**(p-k) is increasing
+  # if c is positive and decreasing otherwise.
+  # pylint: disable=g-complex-comprehension
+  enc_decreasing, enc_increasing = [
+      sharp_enclosure_monotonic_derivative(
+          x0, degree, trust_region, lambda x: x**exponent,
+          taylor_coefficients_at_x0, increasing, np_like
+      )
+      for increasing in [False, True]
+  ]
+  enc_pos = enc_decreasing if c > 0 else enc_increasing
+  if exponent - degree % 2 == 0:
+    enc_neg = enc_pos
+  else:
+    enc_neg = enc_increasing if c > 0 else enc_decreasing
+
+  def interval_endpoint(i):
+    """Returns left (i == 0) or right (i == 1) endpoint of interval."""
+    a, b = trust_region
+    endpoint_if_positive = enc_pos[-1][i]
+    if int(exponent) != exponent:
+      # If exponent is not an integer, then z**exponent is undefined for z < 0.
+      # We return the interval (-inf, inf) in this case.
+      endpoint_if_negative = -np_like.inf if i == 0 else np_like.inf
+      endpoint_if_possibly_zero = endpoint_if_negative
+    elif exponent < 0:
+      endpoint_if_negative = enc_neg[-1][i]
+      endpoint_if_possibly_zero = -np_like.inf if i == 0 else np_like.inf
+    else:
+      endpoint_if_negative = enc_neg[-1][i]
+      endpoint_if_possibly_zero = functools.reduce(
+          np_like.minimum if i == 0 else np_like.maximum,
+          [endpoint_if_positive, endpoint_if_negative]
+      )
+    return np_like.where(
+        a >= 0,
+        endpoint_if_positive,
+        np_like.where(
+            b <= 0,
+            endpoint_if_negative,
+            endpoint_if_possibly_zero
+        )
+    )
+
+  interval_coefficient = tuple(interval_endpoint(i) for i in [0, 1])
+  return enc_decreasing[:-1] + (interval_coefficient,)
+
+
+def softplus_enclosure(x0: NDArray,
+                       trust_region: Interval,
+                       degree: int,
+                       np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns an ElementwiseTaylorEnclosure for softplus(x) in terms of x-x0."""
+  def softplus(x: NDArrayLike) -> NDArray:
+    # Avoid overflow for large positive x using:
+    # log(1+exp(x)) == log(1+exp(-|x|)) + max(x, 0).
+    return np_like.log1p(np_like.exp(-np_like.abs(x))) + np_like.maximum(x, 0)
+
+  if degree == 0:
+    a, b = trust_region
+    return ((softplus(a), softplus(b)),)  # pytype: disable=bad-return-type
+  elif degree == 2:
+    p = 1/(1+np_like.exp(-x0))
+    taylor_coefficients_at_x0 = [softplus(x0), p, p*(1-p) / 2]
+    return sharp_quadratic_enclosure_even_symmetric_hessian(
+        x0, trust_region, softplus, taylor_coefficients_at_x0, np_like)
+  else:
+    raise NotImplementedError(degree)
+
+
+def bounded_derivative_enclosure(
+    degree: int,
+    taylor_coefficients_at_x0: Sequence[NDArray],
+    derivative_bound: Tuple[NDArray, NDArray]
+) -> ElementwiseTaylorEnclosure:
+  if len(taylor_coefficients_at_x0) != degree:
+    raise ValueError()
+  return ElementwiseTaylorEnclosure(
+      tuple(taylor_coefficients_at_x0[:degree]) + (derivative_bound,)
+  )
+
+
+def sharp_enclosure_monotonic_derivative(
+    x0: NDArray,
+    degree: int,
+    trust_region: Interval,
+    sigma: Callable[[NDArray], NDArray],
+    taylor_coefficients_at_x0: Sequence[NDArray],
+    increasing: bool,
+    np_like: NumpyLike
+) -> ElementwiseTaylorEnclosure:
+  """Returns sharp degree-k enclosure assuming monotone k-th derivative.
+
+  Args:
+    x0: the center point for the Taylor enclosure
+    degree: the degree of the enclosure to return
+    trust_region: the trust region over which to compute an enclosure
+    sigma: the function for which to compute a sharp polynomial enclosure
+    taylor_coefficients_at_x0: the first (degree+1) coefficients of the
+      Taylor series expansion of sigma at x0.
+    increasing: whether the (degree)th derivative of sigma is increasing
+      or decreasing
+    np_like: a NumpyLike backend
+
+  Returns:
+    a sharp ElementwiseTaylorEnclosure for sigma
+  """
+  if degree < 0:
+    raise ValueError(degree)
+  ratio = functools.partial(taylor_remainder_ratio,
+                            x0, degree, sigma,
+                            taylor_coefficients_at_x0,
+                            np_like=np_like)
+  a, b = trust_region
+  if increasing:
+    final_interval = (ratio(a), ratio(b))
+  else:
+    final_interval = (ratio(b), ratio(a))
+  return ElementwiseTaylorEnclosure(
+      tuple(taylor_coefficients_at_x0[:degree]) + (final_interval,)
+  )
+
+
+def sharp_quadratic_enclosure_even_symmetric_hessian(
+    x0: NDArray,
+    trust_region: Interval,
+    sigma: Callable[[NDArray], NDArray],
+    taylor_coefficients_at_x0: Sequence[NDArray],
+    np_like: NumpyLike
+) -> ElementwiseTaylorEnclosure:
+  """Returns sharp quadratic enclosure for function with even-symmetric Hessian.
+
+  It's assumed that the Hessian is decreasing at z >= 0.
+
+  Args:
+    x0: the center point for the Taylor enclosure
+    trust_region: the trust region over which to compute an enclosure
+    sigma: an elementwise function for which to compute a Taylor enclosure
+    taylor_coefficients_at_x0: the first two coefficients of the
+      Taylor series expansion of sigma at x0.
+    np_like: a Numpy-like back end.
+  """
+  ratio = functools.partial(taylor_remainder_ratio,
+                            x0, 2, sigma,
+                            taylor_coefficients_at_x0,
+                            np_like=np_like)
+
+  a, b = trust_region
+  max_ratio = ratio(np_like.clip(-x0, a, b))
+  min_ratio = np_like.minimum(ratio(a), ratio(b))
+  final_interval = (min_ratio, max_ratio)
+  return ElementwiseTaylorEnclosure(
+      tuple(taylor_coefficients_at_x0[:2]) + (final_interval,)
+  )
+
+
+def taylor_remainder_ratio(
+    x0: NDArray,
+    degree: int,
+    sigma: Callable[[NDArray], NDArray],
+    taylor_coefficients_at_x0: Sequence[NDArray],
+    x: NDArray,
+    np_like: NumpyLike):
+  """Returns R_{degree - 1}(x; sigma, x0) / (x - x0)**degree."""
+  if len(taylor_coefficients_at_x0) != degree + 1:
+    raise ValueError(degree, taylor_coefficients_at_x0)
+  # Let r_k denote the degree k Taylor series remainder.
+  #
+  # Letting k = degree, we want to return r_{k-1} / (x-x0)**k, but in a way that
+  # is numerically stable when x-x0 is small (and that is well-defined when
+  # x=x0).
+  #
+  # We do so using:
+  #     r_{k-1} / (x-x0)**k = (r_k + c_k*(x-x0)**k) / (x-x0)**k
+  #                         = c_k + r_k / (x-x0)**k.
+  r_k = sigma(x) - sum(
+      c * (x - x0)**i for i, c in enumerate(taylor_coefficients_at_x0))
+  denom = (x-x0)**degree
+  return (
+      taylor_coefficients_at_x0[degree] +
+      # Return r_k * 1 / denom, capping the magnitude of 1 / denom at 1e12.
+      # TODO(mstreeter): this results in an enclosure that's  not strictly valid
+      # when denom is very small.
+      r_k * np_like.sign(denom) / (np_like.maximum(1e-12, np_like.abs(denom)))
+  )

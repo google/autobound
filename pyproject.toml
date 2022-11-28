@@ -1,0 +1,46 @@
+[project]
+name = "autobound"
+description = ""
+readme = "README.md"
+requires-python = ">=3.7"
+license = {file = "LICENSE"}
+authors = [{name = "AutoBound authors", email="autobound@google.com"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+]
+keywords = []
+
+# pip dependencies of the project
+dependencies = [
+    "jax"
+]
+
+# This is set automatically by flit using `autobound.__version__`
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://github.com/google/autobound"
+repository = "https://github.com/google/autobound"
+# Other: `documentation`, `changelog`
+
+[project.optional-dependencies]
+# Development deps (unittest, linting, formating,...)
+# Installed through `pip install .[dev]`
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "pylint>=2.6.0",
+    "pyink",
+]
+
+[tool.pyink]
+# Formatting configuration to follow Google style-guide
+pyink-indentation = 2
+pyink-use-majority-quotes = true
+
+[build-system]
+requires = ["flit_core >=3.5,<4"]
+build-backend = "flit_core.buildapi"
