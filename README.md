@@ -9,7 +9,9 @@ As an example, here are the quadratic upper and lower bounds AutoBound computes
 for the function `f(x) = 1.5*exp(3*x) - 25*(x**2)`, centered at `0.5`, and
 valid over the trust region `[0, 1]`.
 
+<p align="center">
 ![Example quadratic upper and lower bounds](autobound/example_bounds.png)
+</p>
 
 The code to compute the bounds shown in this plot looks like this:
 
