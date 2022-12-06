@@ -176,6 +176,7 @@ def taylor_bounds(
         if propagate_trust_regions:
           fun0 = primitive_to_enclosure_fun0.get(eqn.primitive)
           assert fun0 is not None
+          assert all(i.trust_region is not None for i in invar_intermediates)
           invar_degree_0_intermediates = [
               _IntermediateEnclosure(
                   enclosure=types.TaylorEnclosure((intermediate.trust_region,)))
@@ -210,8 +211,6 @@ def taylor_bounds(
         vals = eqn.primitive.bind(*invar_values, **eqn.params)
         if len(eqn.outvars) == 1:
           vals = (vals,)
-        if propagate_trust_regions:
-          raise NotImplementedError()
         outvar_intermediates = [_constant_intermediate_enclosure(v)
                                 for v in vals]
 
@@ -271,7 +270,8 @@ def _broadcast_in_dim_pushforward_fun(intermediate, shape,
 
 
 def _constant_intermediate_enclosure(val: types.NDArray):
-  return _IntermediateEnclosure(enclosure=types.TaylorEnclosure((val,)))
+  return _IntermediateEnclosure(enclosure=types.TaylorEnclosure((val,)),
+                                trust_region=(val, val))
 
 
 def _conv_general_dilated_pushforward_fun(arithmetic):

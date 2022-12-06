@@ -135,6 +135,24 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (5.14, 1.),
       ),
       (
+          'constant_prop_0',
+          lambda x: jnp.exp(1),
+          1,
+          .5,
+          (0, 1),
+          True,
+          (math.e,),
+      ),
+      (
+          'constant_prop_1',
+          lambda x: jnp.eye(3) @ (jnp.zeros((3,)) * x),
+          1,
+          .5,
+          (0, 1),
+          True,
+          (np.zeros((3,)), np.zeros((3,))),
+      ),
+      (
           'multiplication',
           lambda x: 2*x,
           1,
@@ -447,7 +465,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           )
       ),
       # TODO(mstreeter): test convolutions where the input is not a scalar.
-
   )
   def test_taylor_bounds(
       self, f, max_degree, test_x0, test_trust_region, propagate_trust_regions,
