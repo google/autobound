@@ -1,4 +1,4 @@
-# AutoBound: Automatically Deriving Upper and Lower Bounds on Arbitrary Functions
+# AutoBound: Automatically Bounding Functions
 
 AutoBound is a generalization of automatic differentiation.  In addition to
 computing a Taylor polynomial approximation of a function, it computes upper
@@ -30,12 +30,13 @@ bounds = ab.taylor_bounds(f, 2)(x0, trust_region)
 ```
 
 These bounds can be used for:
- * computing learning rates that are guaranteed to reduce a loss function,
- * upper and lower bounding integrals,
- * proving optimality guarantees in global optimization,
- * and more.
+- Computing learning rates that are guaranteed to reduce a loss function
+- Upper and lower bounding integrals
+- Proving optimality guarantees in global optimization
 
-Example code coming soon!
+and more!
+
+*Example code coming soon*
 
 Under the hood, AutoBound computes these bounds using an interval arithmetic
 variant of Taylor-mode automatic differentiation.  Accordingly, the memory
@@ -44,5 +45,7 @@ practical for functions with low-dimensional inputs.  A reverse-mode algorithm
 that efficiently handles high-dimensional inputs is under development.
 
 A paper describing AutoBound will be released soon.
+
+---
 
 *This is not an officially supported Google product.*
