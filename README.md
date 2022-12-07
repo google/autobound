@@ -1,5 +1,4 @@
-# AutoBound
-#### Automatically Deriving Upper and Lower Bounds on Arbitrary Functions
+# AutoBound: Automatically Bounding Functions
 
 AutoBound is a generalization of automatic differentiation.  In addition to
 computing a Taylor polynomial approximation of a function, it computes upper
