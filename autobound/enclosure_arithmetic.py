@@ -27,8 +27,8 @@ from autobound.types import (
     TaylorEnclosureLike)
 
 
-class TruncatedTaylorEnclosureArithmetic:
-  """Truncated Taylor enclosure arithmetic via a numpy-like back end.
+class TaylorEnclosureArithmetic:
+  """Taylor enclosure arithmetic via a numpy-like back end.
 
   Given a specified trust region, maximum polynomial degree D, and NumpyLike
   back end, this class allows you to perform arithmetic operations on
@@ -47,7 +47,7 @@ class TruncatedTaylorEnclosureArithmetic:
   Example usage:
     import jax.numpy as jnp
     trust_region = (jnp.zeros((3,)), jnp.array([1, 2, 3]))
-    arithmetic = TruncatedTaylorEnclosureArithmetic(2, trust_region, jnp)
+    arithmetic = TaylorEnclosureArithmetic(2, trust_region, jnp)
     arithmetic.power(
         TaylorEnclosure((0, 1),
         4
@@ -328,12 +328,13 @@ class TruncatedTaylorEnclosureArithmetic:
       term_power_coefficient = functools.partial(
           _elementwise_term_power_coefficient, x_ndim=x_ndim,
           np_like=self.np_like)
-      result = polynomials.integer_power(
+      multiplicative_identity = self.np_like.ones_like(self.trust_region[0])
+      result = polynomials.integer_power(  # pytype: disable=wrong-arg-types
           a,
           p,
           self.set_arithmetic.add,
           self.np_like.asarray(0),
-          self.np_like.asarray(1),
+          multiplicative_identity,
           term_product_coefficient,
           term_power_coefficient,
           self.set_arithmetic.multiply
@@ -452,8 +453,8 @@ def _pairwise_batched_multiply(
     np_like: NumpyLike) -> NDArray:
   """Batched version of multiply, for use as input to arbitrary_bilinear().
 
-  See the docstring for TruncatedTaylorEnclosureArithmetic.arbitrary_bilinear
-  for context.
+  See the docstring for TaylorEnclosureArithmetic.arbitrary_bilinear for
+  context.
 
   Args:
     u: an NDArray of dimension at least p

@@ -13,7 +13,7 @@ valid over the trust region `[0, 1]`.
 <img src="autobound/example_bounds.png" alt="Example quadratic upper and lower bounds"></img>
 </div>
 
-The code to compute the bounds shown in this plot looks like this:
+The code to compute the bounds shown in this plot looks like this: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/autobound/blob/main/notebooks/quickstart.ipynb)
 
 ```python
 import autobound.jax as ab
@@ -31,9 +31,9 @@ bounds = ab.taylor_bounds(f, 2)(x0, trust_region)
 
 These bounds can be used for:
 
-- Computing learning rates that are guaranteed to reduce a loss function
-- Upper and lower bounding integrals
-- Proving optimality guarantees in global optimization
+*   Computing learning rates that are guaranteed to reduce a loss function
+*   Upper and lower bounding integrals
+*   Proving optimality guarantees in global optimization
 
 and more!
 
@@ -45,8 +45,39 @@ requirements are linear in the input dimension, and the method is only
 practical for functions with low-dimensional inputs.  A reverse-mode algorithm
 that efficiently handles high-dimensional inputs is under development.
 
-A paper describing AutoBound will be released soon.
+A detailed description of the AutoBound algorithm can be found in
+[this paper](https://arxiv.org/abs/2212.11429).
 
----
+## Installation
+
+This package can be installed from PyPI with
+
+```bash
+pip install autobound
+```
+
+## Limitations
+
+The current code has a few limitations:
+
+*   Only JAX-traceable functions can be automatically bounded.
+*   Many JAX library functions are not yet supported.  What _is_
+    supported is bounding the squared error loss of a multi-layer perceptron or convolutional neural network that uses the `jax.nn.sigmoid`, `jax.nn.softplus`, or `jax.nn.swish` activation functions.
+*   To compute accurate bounds for deeper neural networks, you may need to use
+    `float64` rather than `float32`.
+
+## Citing AutoBound
+
+To cite this repository:
+
+```
+@article{autobound2022,
+  title={Automatically Bounding the Taylor Remainder Series: Tighter Bounds and New Applications},
+  author={Streeter, Matthew and Dillon, Joshua V},
+  journal={arXiv preprint arXiv:2212.11429},
+  url = {http://github.com/google/autobound},
+  year={2022}
+}
+```
 
 *This is not an officially supported Google product.*

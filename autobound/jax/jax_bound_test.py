@@ -80,7 +80,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_dot_general_pushforward_fun(self, max_degree, trust_region,
                                        lhs, rhs, params, expected):
-    arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
         max_degree, trust_region, jnp)
     fun = jax_bound._dot_general_pushforward_fun(arithmetic)
     actual = fun(jax_bound._IntermediateEnclosure(enclosure=lhs),
@@ -135,6 +135,15 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (5.14, 1.),
       ),
       (
+          'constant',
+          lambda x: 2.,
+          1,
+          .5,
+          (0, 1),
+          False,
+          (2.,),
+      ),
+      (
           'constant_prop_0',
           lambda x: jnp.exp(1),
           1,
@@ -165,10 +174,14 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           'abs',
           jnp.abs,
           1,
-          np.array([-1, 0, 2]),
-          (np.array([-10, -10, -10]), np.array([10, 10, 10])),
+          np.array([0., 1., 1., -1., -1.]),
+          (
+              np.array([-1., 0., -1., -2., -2.]),
+              np.array([2., 2., 2., 0., 1.])
+          ),
           False,
-          (np.array([1, 0, 2]), (-np.eye(3), np.eye(3)))
+          (np.array([0., 1., 1., 1., 1.]),
+           (np.diag([-1., 1., 0., -1., -1.]), np.diag([1., 1., 1., -1., 0.])))
       ),
       (
           'exp',
@@ -465,6 +478,33 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           )
       ),
       # TODO(mstreeter): test convolutions where the input is not a scalar.
+      (
+          'jax_nn_sigmoid',
+          jax.nn.sigmoid,
+          0,
+          0.,
+          (-1., 1.),
+          False,
+          ((1/(1+math.exp(1)), 1/(1+math.exp(-1))),)
+      ),
+      (
+          'jax_nn_softplus',
+          jax.nn.softplus,
+          0,
+          0.,
+          (-1., 1.),
+          False,
+          ((math.log(1+math.exp(-1)), math.log(1+math.exp(1))),)
+      ),
+      (
+          'jax_nn_swish',
+          jax.nn.swish,
+          0,
+          2.,
+          (1., 3.),
+          False,
+          ((test_utils.swish(1), test_utils.swish(3)),)
+      ),
   )
   def test_taylor_bounds(
       self, f, max_degree, test_x0, test_trust_region, propagate_trust_regions,

@@ -39,8 +39,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_add(self, max_degree, trust_region, a, b, expected):
-    for np_like in test_utils.BACKENDS:
-      arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    for np_like in self.backends:
+      arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.add(a, b)
       self.assert_enclosure_equal(expected, actual)
@@ -58,7 +58,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_arbitrary_bilinear(self, max_degree, trust_region, np_like, a, b,
                               pairwise_batched_bilinear, expected):
-    arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
         max_degree, trust_region, np_like)
     actual = arithmetic.arbitrary_bilinear(a, b, pairwise_batched_bilinear)
     self.assert_enclosure_equal(expected, actual)
@@ -111,7 +111,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   def test_compose_enclosures(
       self, max_degree, trust_region, np_like, scalar_enclosure, arg_enclosure,
       expected):
-    arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
         max_degree, trust_region, np_like)
     actual = arithmetic.compose_enclosures(scalar_enclosure, arg_enclosure)
     self.assert_enclosure_equal(expected, actual)
@@ -131,7 +131,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_enclose_enclosure(self, enclosure, trust_region, max_degree,
                              expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = enclosure_arithmetic.enclose_enclosure(
           enclosure, trust_region, max_degree, np_like)
       self.assert_enclosure_equal(expected, actual)
@@ -170,8 +170,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       (100, (-13., 17.), ((-.5, .5),), ((-.5, .5),), ((-.25, .25),)),
   )
   def test_multiply(self, max_degree, trust_region, a, b, expected):
-    for np_like in test_utils.BACKENDS:
-      arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    for np_like in self.backends:
+      arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.multiply(a, b)
       self.assert_enclosure_equal(expected, actual)
@@ -183,8 +183,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       (0, (0, .25), (1, 2), ((-1.5, -1.),)),
   )
   def test_negative(self, max_degree, trust_region, a, expected):
-    for np_like in test_utils.BACKENDS:
-      arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    for np_like in self.backends:
+      arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.negative(a)
       self.assert_enclosure_equal(expected, actual)
@@ -196,7 +196,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
        np.zeros((2, 3, 5, 7, 11))),
   )
   def test_pairwise_batched_multiply(self, u, v, p, q, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = enclosure_arithmetic._pairwise_batched_multiply(u, v, p, q,
                                                                np_like)
       self.assert_allclose_strict(expected, actual)
@@ -218,10 +218,17 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
            )
           )
       ),
+      (
+          100,
+          (np.zeros((3,)), np.ones((3,))),
+          (.5*np.ones((3,)),),
+          0,
+          (np.ones((3,)),)
+      ),
   )
   def test_power(self, max_degree, trust_region, enclosure, p, expected):
-    for np_like in test_utils.BACKENDS:
-      arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    for np_like in self.backends:
+      arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.power(enclosure, p)
       print('actual =', actual)
@@ -232,8 +239,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       (1, (0, .5), (1, 2, 3), (10, 20), (-9, (-18., -16.5))),
   )
   def test_subtract(self, max_degree, trust_region, a, b, expected):
-    for np_like in test_utils.BACKENDS:
-      arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    for np_like in self.backends:
+      arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.subtract(a, b)
       self.assert_enclosure_equal(expected, actual)
@@ -271,7 +278,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_elementwise_term_product_coefficient(
       self, c0, c1, i, j, x_ndim, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = enclosure_arithmetic._elementwise_term_product_coefficient(
           c0, c1, i, j, x_ndim, np_like)
       self.assert_interval_equal(expected, actual)
@@ -312,7 +319,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_elementwise_term_power_coefficient(
       self, c, i, exponent, x_ndim, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = enclosure_arithmetic._elementwise_term_power_coefficient(
           c, i, exponent, x_ndim, np_like)
       self.assert_interval_equal(expected, actual)
@@ -326,7 +333,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_left_broadcasting_multiply(self, a, b, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = enclosure_arithmetic._left_broadcasting_multiply(a, b, np_like)
       self.assert_allclose_strict(expected, actual)
 

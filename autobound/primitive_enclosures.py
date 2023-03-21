@@ -12,65 +12,82 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A library of Taylor enclosures for various primitive functions."""
+"""A library of Taylor enclosures for various primitive functions.
+
+For now this only supports elementwise functions, but in the future it will
+support other multivariate functions.
+"""
 
 import functools
 import math
 from typing import Callable, Sequence, Tuple
 
+from autobound import elementwise_functions
 # pylint: disable=g-multiple-import
 from autobound.types import (
     Interval, NumpyLike, ElementwiseTaylorEnclosure, NDArray, NDArrayLike)
 
 
-def abs_enclosure(x0: NDArray,
-                  unused_trust_region: Interval,
-                  degree: int,
-                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
-  """Returns an ElementwiseTaylorEnclosure for abs(x) in terms of x-x0."""
-  if degree >= 1:
-    return ElementwiseTaylorEnclosure(
-        (np_like.abs(x0), (-np_like.ones_like(x0), np_like.ones_like(x0))))
+def get_elementwise_taylor_enclosure(
+    function_id: elementwise_functions.FunctionId,
+    x0: NDArray,
+    trust_region: Interval,
+    degree: int,
+    np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
+  """Returns ElementwiseTaylorEnclosure for function with given ID.
+
+  Args:
+    function_id: an `elementwise_functions.FunctionId`
+    x0: reference point
+    trust_region: trust region over which enclosure is valid
+    degree: the degree of the returned `ElementwiseTaylorEnclosure`
+    np_like: a `NumpyLike` backend
+
+  Returns:
+    an `ElementwiseTaylorEnclosure` for the elementwise function specified by
+    `function_id`.
+  """
+  f = elementwise_functions.get_function(function_id, np_like)
+  deriv_id = function_id.derivative_id(degree)
+  deriv_data = elementwise_functions.get_function_data(deriv_id)
+  taylor_coefficients = functools.partial(
+      elementwise_functions.get_taylor_polynomial_coefficients,
+      function_id, x0=x0, np_like=np_like)
+  # TODO(mstreeter): return a sharp enclosure as long as the derivative is
+  # monotone over the trust region (instead of checking that it is monotone
+  # everywhere).
+  if (deriv_data.monotonically_increasing or
+      deriv_data.monotonically_decreasing):
+    return sharp_enclosure_monotonic_derivative(
+        x0, degree, trust_region, f, taylor_coefficients(degree),
+        deriv_data.monotonically_increasing, np_like)
+  elif degree == 2 and deriv_data.even_symmetric:
+    return sharp_quadratic_enclosure_even_symmetric_hessian(
+        x0, trust_region, f, taylor_coefficients(degree), np_like)
   else:
-    raise NotImplementedError(degree)
+    deriv_range = elementwise_functions.get_range(deriv_id, trust_region,
+                                                  np_like)
+    return bounded_derivative_enclosure(degree, taylor_coefficients(degree-1),
+                                        deriv_range)
 
 
-def exp_enclosure(x0: NDArray,
-                  trust_region: Interval,
-                  degree: int,
-                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
-  """Returns an ElementwiseTaylorEnclosure for exp(x) in terms of x-x0."""
-  exp_x0 = np_like.exp(x0)
-  taylor_coefficients_at_x0 = []
-  i_factorial = 1
-  for i in range(degree + 1):
-    if i > 0:
-      i_factorial *= i
-    taylor_coefficients_at_x0.append(exp_x0 / i_factorial)
-  return sharp_enclosure_monotonic_derivative(
-      x0, degree, trust_region, np_like.exp, taylor_coefficients_at_x0, True,
-      np_like)
+abs_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                  elementwise_functions.ABS)
+exp_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                  elementwise_functions.EXP)
+log_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                  elementwise_functions.LOG)
+sigmoid_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                      elementwise_functions.SIGMOID)
+softplus_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                       elementwise_functions.SOFTPLUS)
+swish_enclosure = functools.partial(get_elementwise_taylor_enclosure,
+                                    elementwise_functions.SWISH)
 
 
-def log_enclosure(x0: NDArray,
-                  trust_region: Interval,
-                  degree: int,
-                  np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
-  """Returns an ElementwiseTaylorEnclosure for log(x) in terms of x-x0."""
-  # Derivatives of log(x) are:
-  # x**-1, -x**-2, 2x**-3, -6x**-4, ...
-  # ith derivative is (-1)**(i+1) (i-1)! x**-i.
-  # ith coefficient of Taylor polynomial is (-1)**i+1 x**-i / i.
-  # ith derivative is increasing if i is even, decreasing otherwise.
-  taylor_coefficients_at_x0 = [np_like.log(x0)]
-  for i in range(1, degree + 1):
-    taylor_coefficients_at_x0.append((-1 if i % 2 == 0 else 1) * x0**-i / i)
-  increasing = degree % 2 == 0
-  return sharp_enclosure_monotonic_derivative(
-      x0, degree, trust_region, np_like.log, taylor_coefficients_at_x0,
-      increasing, np_like)
-
-
+# TODO(mstreeter): we could implement pow_enclosure in terms of
+# get_elementwise_taylor_enclosure if we allowed FunctionIds to have parameters
+# (in this case, the exponent).
 def pow_enclosure(exponent: float,
                   x0: NDArray,
                   trust_region: Interval,
@@ -144,29 +161,8 @@ def pow_enclosure(exponent: float,
     )
 
   interval_coefficient = tuple(interval_endpoint(i) for i in [0, 1])
-  return enc_decreasing[:-1] + (interval_coefficient,)
-
-
-def softplus_enclosure(x0: NDArray,
-                       trust_region: Interval,
-                       degree: int,
-                       np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
-  """Returns an ElementwiseTaylorEnclosure for softplus(x) in terms of x-x0."""
-  def softplus(x: NDArrayLike) -> NDArray:
-    # Avoid overflow for large positive x using:
-    # log(1+exp(x)) == log(1+exp(-|x|)) + max(x, 0).
-    return np_like.log1p(np_like.exp(-np_like.abs(x))) + np_like.maximum(x, 0)
-
-  if degree == 0:
-    a, b = trust_region
-    return ((softplus(a), softplus(b)),)  # pytype: disable=bad-return-type
-  elif degree == 2:
-    p = 1/(1+np_like.exp(-x0))
-    taylor_coefficients_at_x0 = [softplus(x0), p, p*(1-p) / 2]
-    return sharp_quadratic_enclosure_even_symmetric_hessian(
-        x0, trust_region, softplus, taylor_coefficients_at_x0, np_like)
-  else:
-    raise NotImplementedError(degree)
+  return ElementwiseTaylorEnclosure(
+      enc_decreasing[:-1] + (interval_coefficient,))
 
 
 def bounded_derivative_enclosure(
@@ -176,8 +172,11 @@ def bounded_derivative_enclosure(
 ) -> ElementwiseTaylorEnclosure:
   if len(taylor_coefficients_at_x0) != degree:
     raise ValueError()
+  degree_factorial = math.factorial(degree)
+  final_interval = (derivative_bound[0] / degree_factorial,
+                    derivative_bound[1] / degree_factorial)
   return ElementwiseTaylorEnclosure(
-      tuple(taylor_coefficients_at_x0[:degree]) + (derivative_bound,)
+      tuple(taylor_coefficients_at_x0[:degree]) + (final_interval,)
   )
 
 

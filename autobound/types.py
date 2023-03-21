@@ -485,7 +485,6 @@ class NumpyLike(typing_extensions.Protocol):
   @abc.abstractmethod
   def linspace(self, *args, **kwargs): pass
   @abc.abstractmethod
-  @abc.abstractmethod
   def log(self, x: NDArrayLike) -> NDArray: pass
   @abc.abstractmethod
   def log1p(self, x: NDArrayLike) -> NDArray: pass

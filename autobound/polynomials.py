@@ -22,7 +22,7 @@ from autobound import interval_arithmetic
 from autobound import types
 
 Foo = TypeVar('Foo')  # some arbitrary type, like NDArray or Interval
-FooLike = TypeVar('FooLike', bound=Foo)
+FooLike = TypeVar('FooLike', bound=Foo)  # pytype: disable=invalid-typevar
 
 
 def eval_polynomial(

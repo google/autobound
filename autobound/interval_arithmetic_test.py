@@ -47,7 +47,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_add(self, a, b, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).add(a, b)
       self.assert_interval_equal(expected, actual)
 
@@ -116,7 +116,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_arbitrary_bilinear(self, a, b, get_bilinear, assume_product,
                               expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       bilinear = get_bilinear(np_like)
       arithmetic = interval_arithmetic.IntervalArithmetic(np_like)
       actual = arithmetic.arbitrary_bilinear(a, b, bilinear, assume_product)
@@ -127,7 +127,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ([1, 2, 3], 2, [[1, 0, 0], [0, 2, 0], [0, 0, 3]]),
   )
   def test_generalized_diag_interval(self, a, n, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       arithmetic = interval_arithmetic.IntervalArithmetic(np_like)
       actual = arithmetic._generalized_diag_interval(a, n)
       self.assert_interval_equal(expected, actual)
@@ -166,7 +166,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_multiply(self, a, b, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).multiply(a, b)
       self.assert_interval_equal(expected, actual)
 
@@ -179,7 +179,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_negative(self, a, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).negative(a)
       self.assert_interval_equal(expected, actual)
 
@@ -194,7 +194,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ([2., 3.], 2, 1, np.array([4., 9.])),
   )
   def test_outer_power(self, a, exponent, batch_dims, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).outer_power(
           a, exponent, batch_dims)
       self.assert_interval_equal(expected, actual)
@@ -226,7 +226,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_outer_product(self, a, b, batch_dims, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).outer_product(
           a, b, batch_dims)
       self.assert_interval_equal(expected, actual)
@@ -246,7 +246,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_power(self, a, exponent, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).power(a,
                                                                      exponent)
       self.assert_interval_equal(expected, actual)
@@ -275,7 +275,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
   )
   def test_subtract(self, a, b, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).subtract(a, b)
       self.assert_interval_equal(expected, actual)
 
@@ -286,7 +286,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ((-.5, .5), (-.5, .5), 0, (-.25, .25)),
   )
   def test_tensordot(self, a, b, axes, expected):
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = interval_arithmetic.IntervalArithmetic(np_like).tensordot(
           a, b, axes)
       self.assert_interval_equal(expected, actual)

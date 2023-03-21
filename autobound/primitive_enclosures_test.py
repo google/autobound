@@ -77,6 +77,17 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
     np.testing.assert_allclose(upper_bound, value)
 
   @classmethod
+  def expected_derivative(cls, f, x, order):
+    is_scalar_valued = np.asarray(f(x)).ndim == 0
+    if is_scalar_valued:
+      g = f
+      for _ in range(order):
+        g = jax.grad(g)
+      return g(x)
+    else:
+      raise NotImplementedError()
+
+  @classmethod
   def expected_taylor_coefficients(cls, f, x0, degree):
     """Return Taylor polynomial coefficients for elementwise function."""
     is_scalar_valued = np.asarray(f(x0)).ndim == 0
@@ -106,23 +117,63 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
 
   @parameterized.named_parameters(
       (
-          'abs_scalar',
+          'abs_1',
+          jnp.abs,
+          primitive_enclosures.abs_enclosure,
+          0.,
+          (-1., 2.),
+          1,
+          (0., (-1., 1.))
+      ),
+      (
+          'abs_2',
+          jnp.abs,
+          primitive_enclosures.abs_enclosure,
+          1.,
+          (0., 2.),
+          1,
+          (1., (1., 1.))
+      ),
+      (
+          'abs_3',
+          jnp.abs,
+          primitive_enclosures.abs_enclosure,
+          1.,
+          (-1., 2.),
+          1,
+          (1., (0., 1.))
+      ),
+      (
+          'abs_4',
           jnp.abs,
           primitive_enclosures.abs_enclosure,
           -1.,
-          (-10, 10),
+          (-2., 0.),
           1,
-          (1., (-1., 1.))
+          (1., (-1., -1.))
+      ),
+      (
+          'abs_5',
+          jnp.abs,
+          primitive_enclosures.abs_enclosure,
+          -1.,
+          (-2., 1.),
+          1,
+          (1., (-1., 0.))
       ),
       (
           'abs_ndarray',
           jnp.abs,
           primitive_enclosures.abs_enclosure,
-          np.array([-1., 0., 2.]),
-          (np.array([-10, -10, -10]), np.array([10, 10, 10])),
+          # Tests abs_1 through abs_5, as a single ndarray.
+          np.array([0., 1., 1., -1., -1.]),
+          (
+              np.array([-1., 0., -1., -2., -2.]),
+              np.array([2., 2., 2., 0., 1.])
+          ),
           1,
-          (np.array([1., 0., 2.]),
-           (np.array([-1., -1., -1.]), np.array([1., 1., 1.])))
+          (np.array([0., 1., 1., 1., 1.]),
+           (np.array([-1., 1., 0., -1., -1.]), np.array([1., 1., 1., -1., 0.])))
       ),
       (
           'exp_degree_0',
@@ -245,22 +296,110 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           )
       ),
       (
-          'softplus_degree_2',
-          lambda x: jnp.log1p(jnp.exp(x)),
-          primitive_enclosures.softplus_enclosure,
+          'sigmoid_degree_0',
+          jax.nn.sigmoid,
+          primitive_enclosures.sigmoid_enclosure,
+          0.,
+          (-1, 1),
+          0,
+          ((test_utils.sigmoid(-1.), test_utils.sigmoid(1.)),),
+      ),
+      (
+          'sigmoid_degree_1',
+          jax.nn.sigmoid,
+          primitive_enclosures.sigmoid_enclosure,
+          0.,
+          (-1, 1),
+          1,
+          (test_utils.sigmoid(0.),
+           (test_utils.sigmoid_deriv(-1.), test_utils.MAX_SIGMOID_DERIV),),
+      ),
+      (
+          'sigmoid_degree_2',
+          jax.nn.sigmoid,
+          primitive_enclosures.sigmoid_enclosure,
           0.,
           (-1, 1),
           2,
-          (math.log(2), .5, (math.log(1+math.exp(1)) - math.log(2) - .5, .125)),
+          (
+              test_utils.sigmoid(0.),
+              test_utils.sigmoid_deriv(0.),
+              (
+                  test_utils.sigmoid_second_deriv(1.)/2,
+                  test_utils.sigmoid_second_deriv(-1.)/2
+              )
+          ),
+      ),
+      (
+          'sigmoid_degree_3',
+          jax.nn.sigmoid,
+          primitive_enclosures.sigmoid_enclosure,
+          0.,
+          (-1, 1),
+          3,
+          (test_utils.sigmoid(0.), test_utils.sigmoid_deriv(0.),
+           test_utils.sigmoid_second_deriv(0.)/2,
+           (test_utils.MIN_SIGMOID_THIRD_DERIV/6,
+            test_utils.sigmoid_third_deriv(-1.)/6),),
       ),
       (
           'softplus_degree_0',
-          lambda x: jnp.log1p(jnp.exp(x)),
+          jax.nn.softplus,
           primitive_enclosures.softplus_enclosure,
           0.,
           (-1, 1),
           0,
-          ((math.log(1+math.exp(-1)), math.log(1+math.exp(1))),),
+          ((test_utils.softplus(-1), test_utils.softplus(1)),),
+      ),
+      (
+          'softplus_degree_1',
+          jax.nn.softplus,
+          primitive_enclosures.softplus_enclosure,
+          0.,
+          (-1, 1),
+          1,
+          # The 1st derivative (sigmoid) is monotonically increasing, so we
+          # should get the sharp degree-1 enclosure here.
+          (test_utils.softplus(0.),
+           (test_utils.softplus(0.) - test_utils.softplus(-1.),
+            test_utils.softplus(1.) - test_utils.softplus(0.)),),
+      ),
+      (
+          'softplus_degree_2',
+          jax.nn.softplus,
+          primitive_enclosures.softplus_enclosure,
+          0.,
+          (-1, 1),
+          2,
+          (math.log(2), .5, (test_utils.softplus(1) - math.log(2) - .5, .125)),
+      ),
+      (
+          'softplus_degree_3',
+          jax.nn.softplus,
+          primitive_enclosures.softplus_enclosure,
+          0.,
+          (-1, 1),
+          3,
+          (test_utils.softplus(0.), test_utils.sigmoid(0.),
+           test_utils.sigmoid_deriv(0.) / 2,
+           (test_utils.sigmoid_second_deriv(1.)/6,
+            test_utils.sigmoid_second_deriv(-1.)/6),),
+      ),
+      (
+          'softplus_degree_4',
+          jax.nn.softplus,
+          primitive_enclosures.softplus_enclosure,
+          0.,
+          (-1, 1),
+          4,
+          (
+              test_utils.softplus(0.),
+              test_utils.sigmoid(0.),
+              test_utils.sigmoid_deriv(0.)/2,
+              test_utils.sigmoid_second_deriv(0.)/6,
+              (test_utils.MIN_SIGMOID_THIRD_DERIV/24,
+              test_utils.sigmoid_third_deriv(-1.)/24),
+          ),
       ),
       (
           'softplus_ndarray',
@@ -343,16 +482,30 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       ),
       # TODO(mstreeter): test enclosure for sqrt(x) when trust region includes
       # negative values.
+      (
+          'swish_degree_0',
+          jax.nn.swish,
+          primitive_enclosures.swish_enclosure,
+          2.,
+          (1., 3.),
+          0,
+          ((test_utils.swish(1.), test_utils.swish(3.)),),
+          [1.],
+          [3.]
+      ),
+      # TODO(mstreeter): test higher-order enclosures for Swish.
   )
   def test_enclosure_generator(self, f, f_enclosure_generator, x0, trust_region,
                                degree, expected, lower_tight_at=(),
                                upper_tight_at=()):
+    if callable(expected):
+      expected = expected()
     # Making x0 float64 is necessary so that Taylor enclosure coefficients are
     # computed precisely enough for tests to pass.
     x0 = np.array(x0, dtype=np.float64)
     self.assert_is_taylor_enclosure(f, expected, x0, trust_region,
                                     lower_tight_at, upper_tight_at)
-    for np_like in test_utils.BACKENDS:
+    for np_like in self.backends:
       actual = f_enclosure_generator(x0, trust_region, degree, np_like)
       self.assert_enclosure_equal(expected, actual, rtol=1e-6)
       self.assert_is_taylor_enclosure(f, actual, x0, trust_region,
@@ -367,7 +520,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2,
           (9, 6, 1),
           True,
-          np,
           (9, 6, (1., 1.))
       ),
       # Non-quadratic, monotonically-increasing Hessian.
@@ -378,7 +530,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2 + x**3,
           (.375, 1.75, 2.5),
           True,
-          np,
           (.375, 1.75, (2., 3.))
       ),
       # Non-quadratic, monotonically-decreasing Hessian.
@@ -389,7 +540,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2 - x**3,
           (.125, .25, -.5),
           False,
-          np,
           (.125, .25, (-1., 0.)),
       ),
       # When trust region is (x0, x0), quadratic coefficient should be
@@ -401,7 +551,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2 - x**3,
           (.125, .25, .25),
           False,
-          np,
           (.125, .25, (.25, .25))
       ),
       # Trust region (x0, x0+eps).
@@ -412,7 +561,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2 - x**3,
           (.125, .25, .25),
           False,
-          np,
           (.125, .25, (.25, .25))
       ),
       # Trust region (x0-eps, x0).
@@ -423,7 +571,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           lambda x: x**2 - x**3,
           (.125, .25, .25),
           False,
-          np,
           (.125, .25, (.25, .25))
       ),
       # Make sure ndarrays are handled as expected.
@@ -438,7 +585,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
               np.array([2.5, 4]),
           ),
           True,
-          np,
           (
               np.array([.375, 2.]),
               np.array([1.75, 5.]),
@@ -451,11 +597,12 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
   )
   def test_sharp_enclosure_monotonic_derivative(
       self, x0, degree, trust_region, sigma, taylor_coefficients_at_x0,
-      increasing, np_like, expected):
-    actual = primitive_enclosures.sharp_enclosure_monotonic_derivative(
-        x0, degree, trust_region, sigma, taylor_coefficients_at_x0, increasing,
-        np_like)
-    self.assert_enclosure_equal(expected, actual)
+      increasing, expected):
+    for np_like in self.backends:
+      actual = primitive_enclosures.sharp_enclosure_monotonic_derivative(
+          x0, degree, trust_region, sigma, taylor_coefficients_at_x0, increasing,
+          np_like)
+      self.assert_enclosure_equal(expected, actual)
 
   @parameterized.parameters(
       # f(x) = 0.
@@ -464,7 +611,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (-1., 1.),
           lambda _: 0.,
           (0., 0., 0.),
-          np,
           (0., 0., (0., 0.))
       ),
       # f(x) = x**2.
@@ -473,18 +619,17 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (-5., 5.),
           lambda x: x**2,
           (9., 6., 2.),
-          np,
           (9., 6., (1., 1.))
       ),
   )
   def test_sharp_quadratic_enclosure_even_symmetric_hessian(
-      self, x0, trust_region, sigma, taylor_coefficients_at_x0, np_like,
-      expected):
-    actual = (
-        primitive_enclosures.sharp_quadratic_enclosure_even_symmetric_hessian(
-            x0, trust_region, sigma, taylor_coefficients_at_x0, np_like)
-    )
-    self.assert_enclosure_equal(expected, actual)
+      self, x0, trust_region, sigma, taylor_coefficients_at_x0, expected):
+    for np_like in self.backends:
+      actual = (
+          primitive_enclosures.sharp_quadratic_enclosure_even_symmetric_hessian(
+              x0, trust_region, sigma, taylor_coefficients_at_x0, np_like)
+      )
+      self.assert_enclosure_equal(expected, actual)
 
 
 if __name__ == '__main__':

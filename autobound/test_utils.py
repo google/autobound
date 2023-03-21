@@ -14,14 +14,47 @@
 
 """Base class for unit tests."""
 
-from absl.testing import absltest
-from jax.config import config as jax_config
-import jax.numpy as jnp
-import numpy as np
-import tensorflow.experimental.numpy as tnp
+import math
+from typing import List
 
-# List of NumpyLike back ends used in various unit tests.
-BACKENDS = (np, jnp, tnp)
+from absl.testing import absltest
+from autobound import types
+import numpy as np
+
+
+MAX_SIGMOID_DERIV = .25
+MIN_SIGMOID_SECOND_DERIV = -0.09622504486493762
+MAX_SIGMOID_SECOND_DERIV = 0.09622504486493762
+MIN_SIGMOID_THIRD_DERIV = -0.125
+MAX_SIGMOID_THIRD_DERIV = 0.04166666666666668
+
+
+def sigmoid(x):
+  return 1/(1+math.exp(-x)) if x >= 0 else math.exp(x)/(1+math.exp(x))
+
+
+def sigmoid_deriv(x):
+  return sigmoid(x)*sigmoid(-x)
+
+
+def sigmoid_second_deriv(x):
+  s = sigmoid(x)
+  return s*sigmoid(-x)*(1-2*s)
+
+
+def sigmoid_third_deriv(x):
+  s = sigmoid(x)
+  sm = sigmoid(-x)
+  return s*sm*((1-2*s)**2 - 2*s*sm)
+
+def softplus(x):
+  # Avoid overflow for large positive x using:
+  # log(1+exp(x)) == log(1+exp(-|x|)) + max(x, 0).
+  return math.log1p(math.exp(-abs(x))) + max(x, 0.)
+
+
+def swish(x):
+  return x*sigmoid(x)
 
 
 class TestCase(absltest.TestCase):
@@ -54,5 +87,26 @@ class TestCase(absltest.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
+    cls.backends = _get_backends()
+
+
+def _get_backends() -> List[types.NumpyLike]:
+  """Returns list of NumpyLike back ends to test."""
+  backends = [np]
+
+  try:
+    from jax.config import config as jax_config
+    import jax.numpy as jnp
+    backends.append(jnp)
     jax_config.update('jax_enable_x64', True)
+  except ModuleNotFoundError:
+    pass
+
+  try:
+    import tensorflow.experimental.numpy as tnp
     tnp.experimental_enable_numpy_behavior()
+    backends.append(tnp)
+  except ModuleNotFoundError:
+    pass
+
+  return backends

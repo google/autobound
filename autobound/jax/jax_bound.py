@@ -16,58 +16,17 @@
 
 import dataclasses
 import functools
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 from autobound import enclosure_arithmetic
 from autobound import interval_arithmetic
 from autobound import polynomials
 from autobound import primitive_enclosures
 from autobound import types
+from autobound.jax import jaxpr_editor
 import jax
+from jax._src import abstract_arrays
 import jax.numpy as jnp
-
-# TODO(mstreeter): add pattern-matching mechanism for handling functions like
-# jax.nn.softplus, which show up in the Jaxpr as an xla_call.
-
-# Type for functions that generate enclosures for primitive elementwise
-# functions.  The callable takes arguments x0, trust_region, degree, and
-# np_like, and returns an ElementwiseTaylorEnclosure (see examples in
-# primitive_enclosures.py).
-ElementwiseEnclosureGeneratingFunction = Callable[
-    [types.NDArray, types.Interval, int, types.NumpyLike],
-    types.ElementwiseTaylorEnclosure
-]
-
-# Dict from Jax Primitive to ElementwiseEnclosureGeneratingFunction.
-_ELEMENTWISE_PRIMITIVE_ENCLOSURES = {
-    jax.lax.abs_p: primitive_enclosures.abs_enclosure,
-    jax.lax.exp_p: primitive_enclosures.exp_enclosure,
-    jax.lax.log_p: primitive_enclosures.log_enclosure,
-    # TODO(mstreeter): add more of these
-}
-# Set of primitives that can be applied separately to each coefficient of a
-# TaylorEnclosure.
-_PASS_THRU_PRIMITIVES = frozenset([
-    jax.lax.convert_element_type_p,
-    jax.lax.reshape_p,
-    jax.lax.reduce_sum_p,
-    jax.lax.reduce_window_sum_p,
-    jax.lax.squeeze_p,
-    jax.lax.transpose_p,
-    # TODO(mstreeter): add more of these
-])
-
-
-def register_elementwise_primitive(
-    p: jax.core.Primitive,
-    get_enclosure: ElementwiseEnclosureGeneratingFunction):
-  """Register an enclosure-generating function for a user-defined primitive.
-
-  Args:
-    p: a jax.core.Primitive
-    get_enclosure: an ElementwiseEnclosureGeneratingFunction for p.
-  """
-  _ELEMENTWISE_PRIMITIVE_ENCLOSURES[p] = get_enclosure
 
 
 @dataclasses.dataclass
@@ -76,7 +35,8 @@ class TaylorBounds:
   x0: jnp.ndarray
   coefficients: types.TaylorEnclosure
 
-  def __call__(self, x: types.NDArrayLike) -> jnp.ndarray:
+  def __call__(self,
+               x: types.NDArrayLike) -> Union[types.NDArray, types.Interval]:
     x = jnp.asarray(x)
     return polynomials.eval_taylor_enclosure(self.coefficients, x-self.x0, jnp)
 
@@ -115,6 +75,8 @@ def taylor_bounds(
   """
   if max_degree < 0:
     raise ValueError(max_degree)
+  if max_degree == 0:
+    propagate_trust_regions = False  # avoid redundant computation
 
   jaxpr_factory = jax.make_jaxpr(f)
   def bound_fun(x0: jnp.array,
@@ -122,17 +84,16 @@ def taylor_bounds(
     trust_region = interval_arithmetic.IntervalArithmetic(jnp).subtract(
         x_trust_region, x0)
 
-    arithmetic = enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
+    arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
         max_degree, trust_region, jnp)
     primitive_to_enclosure_fun = _pushforward_funs(arithmetic)
 
     degree_0_arithmetic = (
-        enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic(
-            0, trust_region, jnp))
+        enclosure_arithmetic.TaylorEnclosureArithmetic(0, trust_region, jnp))
     primitive_to_enclosure_fun0 = _pushforward_funs(degree_0_arithmetic)
 
     closed_jaxpr = jaxpr_factory(x0)
-    jaxpr = closed_jaxpr.jaxpr
+    jaxpr = _rewrite_jaxpr(closed_jaxpr.jaxpr)
 
     x0 = jnp.asarray(x0)
     if x0.ndim == 0:
@@ -197,6 +158,15 @@ def taylor_bounds(
               for a, b in zip(outvar_degree_0_enclosures_a,
                               outvar_degree_0_enclosures_b)
           ]
+          for i, (a, b) in enumerate(outvar_trust_regions):
+            # It should always be the case that the actual value of the ith
+            # output of a function (y0 below) is inside the associated trust
+            # region.  But this invariant may not hold due to floating
+            # point roundoff error, so we enforce it here.
+            #
+            # TODO(mstreeter): add a test case that fails if we remove this.
+            y0 = outvar_enclosures[i][0]
+            outvar_trust_regions[i] = (jnp.minimum(y0, a), jnp.maximum(y0, b))
         else:
           outvar_trust_regions = (None,) * len(outvar_enclosures)
         assert all(isinstance(v, tuple) for v in outvar_enclosures), (
@@ -224,11 +194,103 @@ def taylor_bounds(
         var_to_intermediate[var] = intermediate
 
     assert len(jaxpr.outvars) == 1
-    output_intermediate = var_to_intermediate[jaxpr.outvars[0]]
+    output_intermediate = get_intermediate(jaxpr.outvars[0])
     return TaylorBounds(x0=x0,
                         coefficients=output_intermediate.enclosure)
 
   return bound_fun
+
+
+# Type for functions that generate enclosures for primitive elementwise
+# functions.  The callable takes arguments x0, trust_region, degree, and
+# np_like, and returns an ElementwiseTaylorEnclosure (see examples in
+# primitive_enclosures.py).
+ElementwiseEnclosureGeneratingFunction = Callable[
+    [types.NDArray, types.Interval, int, types.NumpyLike],
+    types.ElementwiseTaylorEnclosure
+]
+
+
+# TODO(mstreeter): add a mechanism for supporting a new elementwise function
+# given its FunctionData.
+def register_elementwise_primitive(
+    p: jax.core.Primitive,
+    get_enclosure: ElementwiseEnclosureGeneratingFunction):
+  """Register an enclosure-generating function for a user-defined primitive.
+
+  Args:
+    p: a jax.core.Primitive
+    get_enclosure: an ElementwiseEnclosureGeneratingFunction for p.
+  """
+  _ELEMENTWISE_PRIMITIVE_ENCLOSURES[p] = get_enclosure
+
+
+#
+# Private variables/functions.
+#
+
+
+_PRIMITIVE_NAMES = set()  # type: Set[str]
+# Rewrite rules are callables that return (pattern Jaxpr, replacement Jaxpr)
+# pairs.  We make them callables because the Jaxpr returned by jax.make_jaxpr
+# depends on how Jax is configured (in particular whether float64 is enabled),
+# and we need to use the Jaxprs that match whatever configuration is being
+# used when the rule is applied.
+_JAXPR_REWRITE_RULES = [
+]  # type: List[Callable[[], Tuple[jax.core.Jaxpr, jax.core.Jaxpr]]]
+
+
+def _register_elementwise_function(
+    f: Callable[[jnp.array], jnp.array],
+    get_enclosure: ElementwiseEnclosureGeneratingFunction
+):
+  """Register enclosure-generating function for elementwise Jax function."""
+  name = f'__autobound_{f.__name__}__'
+  if name in _PRIMITIVE_NAMES:
+    raise ValueError(f)
+  _PRIMITIVE_NAMES.add(name)
+  p = jax.core.Primitive(name)
+  p.def_abstract_eval(
+      lambda x: abstract_arrays.ShapedArray(x.shape, x.dtype, weak_type=True))
+  rule = lambda: (jax.make_jaxpr(f)(0.).jaxpr, jax.make_jaxpr(p.bind)(0.).jaxpr)
+  _JAXPR_REWRITE_RULES.append(rule)
+  register_elementwise_primitive(p, get_enclosure)
+
+
+# Dict from Jax Primitive to ElementwiseEnclosureGeneratingFunction.
+# TODO(mstreeter): support more elementwise functions.
+_ELEMENTWISE_PRIMITIVE_ENCLOSURES = {
+    jax.lax.abs_p: primitive_enclosures.abs_enclosure,
+    jax.lax.exp_p: primitive_enclosures.exp_enclosure,
+    jax.lax.log_p: primitive_enclosures.log_enclosure,
+}
+_register_elementwise_function(jax.nn.sigmoid,
+                               primitive_enclosures.sigmoid_enclosure)
+_register_elementwise_function(jax.nn.softplus,
+                               primitive_enclosures.softplus_enclosure)
+_register_elementwise_function(jax.nn.swish,
+                               primitive_enclosures.swish_enclosure)
+
+
+# Set of primitives that can be applied separately to each coefficient of a
+# TaylorEnclosure.
+_PASS_THRU_PRIMITIVES = frozenset([
+    jax.lax.convert_element_type_p,
+    jax.lax.reshape_p,
+    jax.lax.reduce_sum_p,
+    jax.lax.reduce_window_sum_p,
+    jax.lax.squeeze_p,
+    jax.lax.transpose_p,
+    # TODO(mstreeter): add more of these
+])
+
+
+def _rewrite_jaxpr(jaxpr: jax.core.Jaxpr) -> jax.core.Jaxpr:
+  """Rewrite a Jaxpr to make is suitable for use by taylor_bounds()."""
+  for rule_generator in _JAXPR_REWRITE_RULES:
+    pattern, replacement = rule_generator()
+    jaxpr = jaxpr_editor.replace(pattern, replacement, jaxpr)
+  return jaxpr
 
 
 @dataclasses.dataclass
@@ -245,7 +307,7 @@ class _IntermediateEnclosure:
     if not self.is_constant():
       raise ValueError()
     else:
-      return self.enclosure[0]
+      return self.enclosure[0]  # pytype: disable=bad-return-type
 
 
 def _broadcast_in_dim_pushforward_fun(intermediate, shape,
@@ -375,7 +437,7 @@ PushforwardFunction = Callable[
 
 
 def _pushforward_funs(
-    arithmetic: enclosure_arithmetic.TruncatedTaylorEnclosureArithmetic
+    arithmetic: enclosure_arithmetic.TaylorEnclosureArithmetic
 ) -> Dict[jax.core.Primitive, PushforwardFunction]:
   """Returns dict from primitive to function that inputs/outputs enclosures."""
   def pushforward_integer_pow(intermediate, y: int):
@@ -423,4 +485,3 @@ def _validate_taylor_enclosure(a: types.TaylorEnclosureLike, x_shape):
     s = set_arithmetic.shape(coeff)
     if s[len(s)-i*len(x_shape):] != i*x_shape:
       raise ValueError(x_shape, i, s, coeff, a)
-
