@@ -30,6 +30,7 @@ bounds = ab.taylor_bounds(f, 2)(x0, trust_region)
 ```
 
 These bounds can be used for:
+
 - Computing learning rates that are guaranteed to reduce a loss function
 - Upper and lower bounding integrals
 - Proving optimality guarantees in global optimization
