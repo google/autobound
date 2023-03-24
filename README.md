@@ -13,7 +13,7 @@ valid over the trust region `[0, 1]`.
 <img src="autobound/example_bounds.png" alt="Example quadratic upper and lower bounds"></img>
 </div>
 
-The code to compute the bounds shown in this plot looks like this (see [quickstart](https://colab.research.google.com/github/google/autobound/blob/main/notebooks/quickstart.ipynb)):
+The code to compute the bounds shown in this plot looks like this (see [quickstart](https://colab.research.google.com/github/google/autobound/blob/main/autobound/notebooks/quickstart.ipynb)):
 
 ```python
 import autobound.jax as ab
@@ -31,8 +31,8 @@ bounds = ab.taylor_bounds(f, 2)(x0, trust_region)
 
 These bounds can be used for:
 
-*   [Computing learning rates that are guaranteed to reduce a loss function](https://colab.research.google.com/github/google/autobound/blob/main/notebooks/safe_learning_rates.ipynb)
-*   [Upper and lower bounding integrals](https://colab.research.google.com/github/google/autobound/blob/main/notebooks/bounding_integrals.ipynb)
+*   [Computing learning rates that are guaranteed to reduce a loss function](https://colab.research.google.com/github/google/autobound/blob/main/autobound/notebooks/safe_learning_rates.ipynb)
+*   [Upper and lower bounding integrals](https://colab.research.google.com/github/google/autobound/blob/main/autobound/notebooks/bounding_integrals.ipynb)
 *   Proving optimality guarantees in global optimization
 
 and more!
