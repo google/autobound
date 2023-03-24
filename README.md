@@ -10,7 +10,7 @@ for the function `f(x) = 1.5*exp(3*x) - 25*(x**2)`, centered at `0.5`, and
 valid over the trust region `[0, 1]`.
 
 <div align="center">
-<img src="autobound/example_bounds.png" alt="Example quadratic upper and lower bounds"></img>
+<img src="http://raw.githubusercontent.com/google/autobound/main/autobound/example_bounds.png" alt="Example quadratic upper and lower bounds"></img>
 </div>
 
 The code to compute the bounds shown in this plot looks like this (see [quickstart](https://colab.research.google.com/github/google/autobound/blob/main/autobound/notebooks/quickstart.ipynb)):
