@@ -231,7 +231,6 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       arithmetic = enclosure_arithmetic.TaylorEnclosureArithmetic(
           max_degree, trust_region, np_like)
       actual = arithmetic.power(enclosure, p)
-      print('actual =', actual)
       self.assert_enclosure_equal(expected, actual)
 
   @parameterized.parameters(

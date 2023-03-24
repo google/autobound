@@ -53,9 +53,6 @@ def get_elementwise_taylor_enclosure(
   taylor_coefficients = functools.partial(
       elementwise_functions.get_taylor_polynomial_coefficients,
       function_id, x0=x0, np_like=np_like)
-  # TODO(mstreeter): return a sharp enclosure as long as the derivative is
-  # monotone over the trust region (instead of checking that it is monotone
-  # everywhere).
   if (deriv_data.monotonically_increasing or
       deriv_data.monotonically_decreasing):
     return sharp_enclosure_monotonic_derivative(
@@ -65,10 +62,33 @@ def get_elementwise_taylor_enclosure(
     return sharp_quadratic_enclosure_even_symmetric_hessian(
         x0, trust_region, f, taylor_coefficients(degree), np_like)
   else:
+    # For indices where the derivative is monotonically decreasing or
+    # monotonically increasing over the trust region, we return the sharp
+    # enclosure.  For other indices, we fall back to using the enclosure
+    # based on the range of the derivative.
+    coeffs = taylor_coefficients(degree)
+    enclosure_if_decreasing, enclosure_if_increasing = [
+        sharp_enclosure_monotonic_derivative(
+            x0, degree, trust_region, f, coeffs, increasing, np_like)
+        for increasing in [False, True]
+    ]
+    decreasing, increasing = deriv_data.monotone_over(trust_region, np_like)
     deriv_range = elementwise_functions.get_range(deriv_id, trust_region,
                                                   np_like)
-    return bounded_derivative_enclosure(degree, taylor_coefficients(degree-1),
-                                        deriv_range)
+    fallback = bounded_derivative_enclosure(degree, coeffs[:-1], deriv_range)
+    def endpoint(i: int):
+      return np_like.where(
+          decreasing,
+          enclosure_if_decreasing[-1][i],
+          np_like.where(
+              increasing,
+              enclosure_if_increasing[-1][i],
+              fallback[-1][i]
+          )
+      )
+    final_interval = (endpoint(0), endpoint(1))
+    return ElementwiseTaylorEnclosure(
+        tuple(coeffs[:degree]) + (final_interval,))
 
 
 abs_enclosure = functools.partial(get_elementwise_taylor_enclosure,

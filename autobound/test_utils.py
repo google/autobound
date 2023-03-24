@@ -29,32 +29,52 @@ MIN_SIGMOID_THIRD_DERIV = -0.125
 MAX_SIGMOID_THIRD_DERIV = 0.04166666666666668
 
 
-def sigmoid(x):
+def sigmoid(x: float) -> float:
   return 1/(1+math.exp(-x)) if x >= 0 else math.exp(x)/(1+math.exp(x))
 
 
-def sigmoid_deriv(x):
-  return sigmoid(x)*sigmoid(-x)
+def sigmoid_derivative(order: int, x: float) -> float:
+  """Returns order `order` derivative of sigmoid at `x`."""
+  if order == 0:
+    return sigmoid(x)
+  elif order == 1:
+    return sigmoid(x)*sigmoid(-x)
+  elif order == 2:
+    s = sigmoid(x)
+    return s*sigmoid(-x)*(1-2*s)
+  elif order == 3:
+    s = sigmoid(x)
+    sm = sigmoid(-x)
+    return s*sm*((1-2*s)**2 - 2*s*sm)
+  elif order == 4:
+    s = sigmoid(x)
+    sm = sigmoid(-x)
+    return (s*sm*(1-2*s)*((1-2*s)**2 - 2*s*sm) +
+            s*sm*(-4*(1-2*s)*s*sm - 2*s*sm*(1-2*s)))
+  else:
+    raise NotImplementedError(order)
 
 
-def sigmoid_second_deriv(x):
-  s = sigmoid(x)
-  return s*sigmoid(-x)*(1-2*s)
-
-
-def sigmoid_third_deriv(x):
-  s = sigmoid(x)
-  sm = sigmoid(-x)
-  return s*sm*((1-2*s)**2 - 2*s*sm)
-
-def softplus(x):
+def softplus(x: float) -> float:
   # Avoid overflow for large positive x using:
   # log(1+exp(x)) == log(1+exp(-|x|)) + max(x, 0).
   return math.log1p(math.exp(-abs(x))) + max(x, 0.)
 
 
-def swish(x):
+def softplus_derivative(order: int, x: float) -> float:
+  if order == 0:
+    return softplus(x)
+  else:
+    return sigmoid_derivative(order-1, x)
+
+
+def swish(x: float) -> float:
   return x*sigmoid(x)
+
+
+def swish_derivative(order: int, x: float) -> float:
+  return (order*sigmoid_derivative(order - 1, x) +
+          x*sigmoid_derivative(order, x))
 
 
 class TestCase(absltest.TestCase):

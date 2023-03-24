@@ -15,22 +15,17 @@
 from absl.testing import absltest
 from autobound import test_utils
 from autobound import types
-import jax.numpy as jnp
-import numpy as np
-import tensorflow.experimental.numpy as tnp
 
 
 class TestCase(test_utils.TestCase):
 
   def test_ndarray(self):
-    self.assertIsInstance(np.eye(3), types.NDArray)
-    self.assertIsInstance(jnp.eye(3), types.NDArray)
-    self.assertIsInstance(tnp.eye(3), types.NDArray)
+    for np_like in self.backends:
+      self.assertIsInstance(np_like.eye(3), types.NDArray)
 
   def test_numpy_like(self):
-    self.assertIsInstance(np, types.NumpyLike)
-    self.assertIsInstance(jnp, types.NumpyLike)
-    self.assertIsInstance(tnp, types.NumpyLike)
+    for np_like in self.backends:
+      self.assertIsInstance(np_like, types.NumpyLike)
 
 
 if __name__ == '__main__':

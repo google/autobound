@@ -40,6 +40,11 @@ class TaylorBounds:
     x = jnp.asarray(x)
     return polynomials.eval_taylor_enclosure(self.coefficients, x-self.x0, jnp)
 
+  def final_interval(self) -> Tuple[jnp.array, jnp.array]:
+    """Returns final coefficient (as a trivial interval, if it is scalar)."""
+    c = self.coefficients[-1]
+    return c if isinstance(c, tuple) else (c, c)
+
   def lower(self, x):
     bound = self(x)
     return bound[0] if isinstance(bound, tuple) else bound

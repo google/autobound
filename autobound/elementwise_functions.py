@@ -20,7 +20,8 @@ import math
 
 from typing import Callable, List, Optional, Sequence, Tuple
 # pylint: disable=g-multiple-import
-from autobound.types import (Interval, NDArray, NDArrayLike, NumpyLike)
+from autobound.types import (Interval, IntervalLike, NDArray, NDArrayLike,
+                             NumpyLike)
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -51,12 +52,62 @@ class FunctionId:
 class FunctionData:
   """An object that lists properties of a one-dimensional function."""
   # The lists of local minima and maxima include all minima/maxima over the
-  # domain of the function.
+  # domain of the function, in ascending order.
   local_minima: Tuple[float, ...]
   local_maxima: Tuple[float, ...]
   monotonically_decreasing: bool = False
   monotonically_increasing: bool = False
   even_symmetric: bool = False  # whether f(x) = f(-x) for all x.
+
+  def monotone_over(
+      self,
+      region: IntervalLike,
+      np_like: NumpyLike) -> Tuple[NDArray, NDArray]:
+    """Returns ndarrays showing whether the function is monotone over `region`.
+
+    Args:
+      region: an `Interval`
+      np_like: a `NumpyLike` back end.
+
+    Returns:
+      a pair of boolean `NDArray`s `(decreasing, increasing)`, where the
+      elements of `decreasing` (resp `increasing`) indicate whether the
+      function is monotonically decreasing (resp increasing) over the interval
+      specified by the corresponding elements of `region`.
+    """
+    x_min = np_like.asarray(region[0])
+    x_max = np_like.asarray(region[1])
+
+    sorted_extrema = sorted(self.local_minima + self.local_maxima)
+    decreasing_conditions = []
+    increasing_conditions = []
+    for i, x in enumerate(sorted_extrema):
+      is_minimum = x in self.local_minima
+      if i == 0:
+        if is_minimum:
+          decreasing_conditions.append(x_max <= x)
+        else:
+          increasing_conditions.append(x_max <= x)
+      else:
+        prev_x = sorted_extrema[i-1]
+        contained = np_like.logical_and(x_min >= prev_x, x_max <= x)
+        if is_minimum:
+          decreasing_conditions.append(contained)
+        else:
+          increasing_conditions.append(contained)
+      if i == len(sorted_extrema) - 1:
+        if is_minimum:
+          increasing_conditions.append(x_min >= x)
+        else:
+          decreasing_conditions.append(x_min >= x)
+
+    decreasing = functools.reduce(
+        np_like.logical_or, decreasing_conditions,
+        np_like.full(x_min.shape, self.monotonically_decreasing))
+    increasing = functools.reduce(
+        np_like.logical_or, increasing_conditions,
+        np_like.full(x_min.shape, self.monotonically_increasing))
+    return decreasing, increasing
 
 
 # FunctionIds for various elementwise functions.

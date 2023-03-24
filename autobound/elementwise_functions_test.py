@@ -108,56 +108,58 @@ class TestCase(test_utils.TestCase, parameterized.TestCase):
       (elementwise_functions.SIGMOID, (-1e6, 1e6), (0., 1.)),
       (elementwise_functions.SIGMOID.derivative_id(1),
        (-2., 1.),
-       (test_utils.sigmoid_deriv(-2.), test_utils.MAX_SIGMOID_DERIV)),
+       (test_utils.sigmoid_derivative(1, -2.), test_utils.MAX_SIGMOID_DERIV)),
       (elementwise_functions.SIGMOID.derivative_id(1),
        (-2., -1.),
-       (test_utils.sigmoid_deriv(-2.), test_utils.sigmoid_deriv(-1.))),
+       (test_utils.sigmoid_derivative(1, -2.),
+        test_utils.sigmoid_derivative(1, -1.))),
       (elementwise_functions.SIGMOID.derivative_id(1), (-1., 3.),
-       (test_utils.sigmoid_deriv(3.), test_utils.MAX_SIGMOID_DERIV)),
+       (test_utils.sigmoid_derivative(1, 3.), test_utils.MAX_SIGMOID_DERIV)),
       (elementwise_functions.SIGMOID.derivative_id(1), (1., 3.),
-       (test_utils.sigmoid_deriv(3.), test_utils.sigmoid_deriv(1.))),
+       (test_utils.sigmoid_derivative(1, 3.),
+        test_utils.sigmoid_derivative(1, 1.))),
       (elementwise_functions.SIGMOID.derivative_id(1), (-1e6, 1e6), (0., .25)),
       (elementwise_functions.SIGMOID.derivative_id(2), (-1e6, -4.),
-       (0., test_utils.sigmoid_second_deriv(-4.))),
+       (0., test_utils.sigmoid_derivative(2, -4.))),
       (elementwise_functions.SIGMOID.derivative_id(2), (-4., -2.),
-       (test_utils.sigmoid_second_deriv(-4.),
-        test_utils.sigmoid_second_deriv(-2.))),
+       (test_utils.sigmoid_derivative(2, -4.),
+        test_utils.sigmoid_derivative(2, -2.))),
       (elementwise_functions.SIGMOID.derivative_id(2), (-2., -.5),
-       (test_utils.sigmoid_second_deriv(-.5),
+       (test_utils.sigmoid_derivative(2, -.5),
         test_utils.MAX_SIGMOID_SECOND_DERIV)),
       (elementwise_functions.SIGMOID.derivative_id(2), (-.5, .5),
-       (test_utils.sigmoid_second_deriv(.5),
-        test_utils.sigmoid_second_deriv(-.5))),
+       (test_utils.sigmoid_derivative(2, .5),
+        test_utils.sigmoid_derivative(2, -.5))),
       (elementwise_functions.SIGMOID.derivative_id(2), (.5, 2.),
        (test_utils.MIN_SIGMOID_SECOND_DERIV,
-        test_utils.sigmoid_second_deriv(.5))),
+        test_utils.sigmoid_derivative(2, .5))),
       (elementwise_functions.SIGMOID.derivative_id(2), (2., 5.),
-       (test_utils.sigmoid_second_deriv(2.),
-        test_utils.sigmoid_second_deriv(5.))),
+       (test_utils.sigmoid_derivative(2, 2.),
+        test_utils.sigmoid_derivative(2, 5.))),
       (elementwise_functions.SIGMOID.derivative_id(2), (5., 1e6),
-       (test_utils.sigmoid_second_deriv(5.), 0.)),
+       (test_utils.sigmoid_derivative(2, 5.), 0.)),
       (elementwise_functions.SIGMOID.derivative_id(3), (-1e6, -4.),
-       (0., test_utils.sigmoid_third_deriv(-4.))),
+       (0., test_utils.sigmoid_derivative(3, -4.))),
       (elementwise_functions.SIGMOID.derivative_id(3), (-4., -3.),
-       (test_utils.sigmoid_third_deriv(-4.),
-        test_utils.sigmoid_third_deriv(-3.))),
+       (test_utils.sigmoid_derivative(3, -4.),
+        test_utils.sigmoid_derivative(3, -3.))),
       (elementwise_functions.SIGMOID.derivative_id(3), (-3., -1.),
-       (test_utils.sigmoid_third_deriv(-1.),
+       (test_utils.sigmoid_derivative(3, -1.),
         test_utils.MAX_SIGMOID_THIRD_DERIV)),
       (elementwise_functions.SIGMOID.derivative_id(3), (-1., .5),
        (test_utils.MIN_SIGMOID_THIRD_DERIV,
-        test_utils.sigmoid_third_deriv(-1.))),
+        test_utils.sigmoid_derivative(3, -1.))),
       (elementwise_functions.SIGMOID.derivative_id(3), (.5, 1.),
-       (test_utils.sigmoid_third_deriv(.5),
-        test_utils.sigmoid_third_deriv(1.))),
+       (test_utils.sigmoid_derivative(3, .5),
+        test_utils.sigmoid_derivative(3, 1.))),
       (elementwise_functions.SIGMOID.derivative_id(3), (1., 3.),
-       (test_utils.sigmoid_third_deriv(1.),
+       (test_utils.sigmoid_derivative(3, 1.),
         test_utils.MAX_SIGMOID_THIRD_DERIV)),
       (elementwise_functions.SIGMOID.derivative_id(3), (3., 4.),
-       (test_utils.sigmoid_third_deriv(4.),
-        test_utils.sigmoid_third_deriv(3.))),
+       (test_utils.sigmoid_derivative(3, 4.),
+        test_utils.sigmoid_derivative(3, 3.))),
       (elementwise_functions.SIGMOID.derivative_id(3), (4., 1e6),
-       (0., test_utils.sigmoid_third_deriv(4.))),
+       (0., test_utils.sigmoid_derivative(3, 4.))),
       (elementwise_functions.SOFTPLUS.derivative_id(1), (-1., 1.),
        (test_utils.sigmoid(-1.), test_utils.sigmoid(1.))),
       (elementwise_functions.SWISH, (1., 2.),
@@ -203,6 +205,60 @@ class TestCase(test_utils.TestCase, parameterized.TestCase):
       actual = elementwise_functions.get_taylor_polynomial_coefficients(
           function_id, degree, x0, np_like)
       self.assert_enclosure_equal(expected, actual)
+
+  @parameterized.parameters(
+      # Function with no local minima.
+      # Because there are no local minima, the function must either be
+      # monotonically decreasing or monotonically increasing.
+      (
+          elementwise_functions.FunctionData((), (),
+                                             monotonically_decreasing=True),
+          ([-3., -2., -1., 0., 1., 2.], [-2., -1., 0., 1., 2., 3.]),
+          (
+              [True] * 6,
+              [False] * 6,
+          )
+      ),
+      (
+          elementwise_functions.FunctionData((), (),
+                                             monotonically_increasing=True),
+          ([-3., -2., -1., 0., 1., 2.], [-2., -1., 0., 1., 2., 3.]),
+          (
+              [False] * 6,
+              [True] * 6,
+          )
+      ),
+      # Function with local minimum at -1 and local maximum at 1.
+      (
+          elementwise_functions.FunctionData((-1.,), (1.,)),
+          ([-3., -2., -1., 0., 1., 2., -3.], [-2., -1., 0., 1., 2., 3., 3.]),
+          (
+              [True, True, False, False, True, True, False],
+              [False, False, True, True, False, False, False],
+          )
+      ),
+      # Function with local maximum at -1 and local minimum at 1.
+      (
+          elementwise_functions.FunctionData((1.,), (-1.,)),
+          ([-3., -2., -1., 0., 1., 2., -3.], [-2., -1., 0., 1., 2., 3., 3.]),
+          (
+              [False, False, True, True, False, False, False],
+              [True, True, False, False, True, True, False],
+          )
+      ),
+  )
+  def test_monotone_over(self, function_data, region, expected):
+    expected_decreasing, expected_increasing = expected
+    region = np.asarray(region)
+    expected_decreasing = np.asarray(expected_decreasing)
+    expected_increasing = np.asarray(expected_increasing)
+    for np_like in self.backends:
+      actual = function_data.monotone_over(region, np_like)
+      self.assertIsInstance(actual, tuple)
+      self.assertLen(actual, 2)
+      actual_decreasing, actual_increasing = actual
+      np.testing.assert_equal(actual_decreasing, expected_decreasing)
+      np.testing.assert_equal(actual_increasing, expected_increasing)
 
   def sanity_check_function_data(self, function_id, function_data):
     # Make sure all local minima/maxima have 0 gradient.

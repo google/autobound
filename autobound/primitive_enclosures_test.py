@@ -312,7 +312,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (-1, 1),
           1,
           (test_utils.sigmoid(0.),
-           (test_utils.sigmoid_deriv(-1.), test_utils.MAX_SIGMOID_DERIV),),
+           (test_utils.sigmoid_derivative(1, -1.),
+            test_utils.MAX_SIGMOID_DERIV),),
       ),
       (
           'sigmoid_degree_2',
@@ -323,11 +324,17 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           2,
           (
               test_utils.sigmoid(0.),
-              test_utils.sigmoid_deriv(0.),
+              test_utils.sigmoid_derivative(1, 0.),
               (
-                  test_utils.sigmoid_second_deriv(1.)/2,
-                  test_utils.sigmoid_second_deriv(-1.)/2
-              )
+                  test_utils.sigmoid(1.) - (
+                      test_utils.sigmoid(0.) +
+                      test_utils.sigmoid_derivative(1, 0.) +
+                      test_utils.sigmoid_derivative(2, 0.)/2),
+                  test_utils.sigmoid(-1.) - (
+                      test_utils.sigmoid(0.) -
+                      test_utils.sigmoid_derivative(1, 0.) -
+                      test_utils.sigmoid_derivative(2, 0.)/2),
+              ),
           ),
       ),
       (
@@ -337,10 +344,10 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           0.,
           (-1, 1),
           3,
-          (test_utils.sigmoid(0.), test_utils.sigmoid_deriv(0.),
-           test_utils.sigmoid_second_deriv(0.)/2,
+          (test_utils.sigmoid(0.), test_utils.sigmoid_derivative(1, 0.),
+           test_utils.sigmoid_derivative(2, 0.)/2,
            (test_utils.MIN_SIGMOID_THIRD_DERIV/6,
-            test_utils.sigmoid_third_deriv(-1.)/6),),
+            test_utils.sigmoid_derivative(3, -1.)/6),),
       ),
       (
           'softplus_degree_0',
@@ -380,10 +387,21 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           0.,
           (-1, 1),
           3,
-          (test_utils.softplus(0.), test_utils.sigmoid(0.),
-           test_utils.sigmoid_deriv(0.) / 2,
-           (test_utils.sigmoid_second_deriv(1.)/6,
-            test_utils.sigmoid_second_deriv(-1.)/6),),
+          (
+              test_utils.softplus(0.),
+              test_utils.sigmoid(0.),
+              test_utils.sigmoid_derivative(1, 0.) / 2,
+              (
+                  test_utils.softplus(1.) - (
+                      test_utils.softplus(0.) +
+                      test_utils.softplus_derivative(1, 0.) +
+                      test_utils.softplus_derivative(2, 0.)/2),
+                  (test_utils.softplus(-1.) - (
+                      test_utils.softplus(0.) -
+                      test_utils.softplus_derivative(1, 0.) +
+                      test_utils.softplus_derivative(2, 0.)/2)) / -1.
+              ),
+          ),
       ),
       (
           'softplus_degree_4',
@@ -395,10 +413,10 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (
               test_utils.softplus(0.),
               test_utils.sigmoid(0.),
-              test_utils.sigmoid_deriv(0.)/2,
-              test_utils.sigmoid_second_deriv(0.)/6,
+              test_utils.sigmoid_derivative(1, 0.)/2,
+              test_utils.sigmoid_derivative(2, 0.)/6,
               (test_utils.MIN_SIGMOID_THIRD_DERIV/24,
-              test_utils.sigmoid_third_deriv(-1.)/24),
+              test_utils.sigmoid_derivative(3, -1.)/24),
           ),
       ),
       (
@@ -487,13 +505,86 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           jax.nn.swish,
           primitive_enclosures.swish_enclosure,
           2.,
+          # The swish function is monotonically increasing over [1, 3].
           (1., 3.),
           0,
           ((test_utils.swish(1.), test_utils.swish(3.)),),
           [1.],
           [3.]
       ),
-      # TODO(mstreeter): test higher-order enclosures for Swish.
+      (
+          'swish_degree_1',
+          jax.nn.swish,
+          primitive_enclosures.swish_enclosure,
+          .5,
+          # Derivative of swish is monotonically increasing over [-1, 1].
+          (-1., 1.),
+          1,
+          (
+              test_utils.swish(.5),
+              (
+                  (test_utils.swish(-1.) - test_utils.swish(.5)) / -1.5,
+                  (test_utils.swish(1.) - test_utils.swish(.5)) / .5
+              ),
+          ),
+      ),
+      (
+          'swish_degree_2',
+          jax.nn.swish,
+          primitive_enclosures.swish_enclosure,
+          .5,
+          # Second derivative of swish is has a local maximum at x=0.
+          (-1., 1.),
+          2,
+          (
+              test_utils.swish(.5),
+              test_utils.swish_derivative(1, .5),
+              (test_utils.swish_derivative(2, -1.) / 2,
+               test_utils.swish_derivative(2, 0.) / 2),
+          ),
+      ),
+      (
+          'swish_degree_3',
+          jax.nn.swish,
+          primitive_enclosures.swish_enclosure,
+          .5,
+          # Third derivative of swish is monotonically decreasing over [-1, 1].
+          (-1., 1.),
+          3,
+          (
+              test_utils.swish(.5),
+              test_utils.swish_derivative(1, .5),
+              test_utils.swish_derivative(2, .5) / 2,
+              (
+                  (test_utils.swish(1.) -
+                   (test_utils.swish(.5) +
+                    .5*test_utils.swish_derivative(1, .5) +
+                    (.5**2)*test_utils.swish_derivative(2, .5)/2)) / .5**3,
+                  (test_utils.swish(-1.) -
+                   (test_utils.swish(.5) +
+                    -1.5*test_utils.swish_derivative(1, .5) +
+                    (1.5**2)*test_utils.swish_derivative(2, .5)/2)) / (-1.5)**3
+              ),
+          ),
+      ),
+      (
+          'swish_degree_4',
+          jax.nn.swish,
+          primitive_enclosures.swish_enclosure,
+          .5,
+          # Fourth derivative of swish is even symmetric, with a local minimum
+          # at x=0.
+          (-1., 1.),
+          4,
+          (
+              test_utils.swish(.5),
+              test_utils.swish_derivative(1, .5),
+              test_utils.swish_derivative(2, .5) / 2,
+              test_utils.swish_derivative(3, .5) / 6,
+              (test_utils.swish_derivative(4, 0.) / 24,
+               test_utils.swish_derivative(4, -1.) / 24),
+          ),
+      ),
   )
   def test_enclosure_generator(self, f, f_enclosure_generator, x0, trust_region,
                                degree, expected, lower_tight_at=(),
@@ -600,8 +691,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
       increasing, expected):
     for np_like in self.backends:
       actual = primitive_enclosures.sharp_enclosure_monotonic_derivative(
-          x0, degree, trust_region, sigma, taylor_coefficients_at_x0, increasing,
-          np_like)
+          x0, degree, trust_region, sigma, taylor_coefficients_at_x0,
+          increasing, np_like)
       self.assert_enclosure_equal(expected, actual)
 
   @parameterized.parameters(
