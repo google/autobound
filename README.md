@@ -1,5 +1,7 @@
 # AutoBound: Automatically Bounding Functions
 
+![PyPI version](https://img.shields.io/pypi/v/autobound)
+
 AutoBound is a generalization of automatic differentiation.  In addition to
 computing a Taylor polynomial approximation of a function, it computes upper
 and lower bounds that are guaranteed to hold over a user-specified
