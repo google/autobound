@@ -1,4 +1,4 @@
-# Copyright 2022 The autobound Authors.
+# Copyright 2023 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ from autobound import test_utils
 from autobound.jax import jax_bound
 from flax import linen as nn
 import jax
-from jax._src import abstract_arrays
 import jax.numpy as jnp
 import numpy as np
 
@@ -30,7 +29,7 @@ import numpy as np
 # Custom softplus primitive, for use in testing registration mechanism.
 my_softplus_p = jax.core.Primitive('my_softplus')
 my_softplus_p.def_abstract_eval(
-    lambda x: abstract_arrays.ShapedArray(x.shape, x.dtype))
+    lambda x: jax.abstract_arrays.ShapedArray(x.shape, x.dtype))
 
 
 def my_softplus(x):
@@ -485,7 +484,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           0.,
           (-1., 1.),
           False,
-          ((1/(1+math.exp(1)), 1/(1+math.exp(-1))),)
+          ((test_utils.sigmoid(-1.), test_utils.sigmoid(1.)),)
       ),
       (
           'jax_nn_softplus',
@@ -494,7 +493,7 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           0.,
           (-1., 1.),
           False,
-          ((math.log(1+math.exp(-1)), math.log(1+math.exp(1))),)
+          ((test_utils.softplus(-1.), test_utils.softplus(1.)),)
       ),
       (
           'jax_nn_swish',
@@ -504,6 +503,49 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           (1., 3.),
           False,
           ((test_utils.swish(1), test_utils.swish(3)),)
+      ),
+      (
+          'jax_nn_sigmoid_ndarray',
+          jax.nn.sigmoid,
+          0,
+          np.array([0., 1.]),
+          (np.array([-1., -2.]), np.array([1., 2.])),
+          False,
+          (
+              (
+                  np.array([test_utils.sigmoid(-1.), test_utils.sigmoid(-2.)]),
+                  np.array([test_utils.sigmoid(1.), test_utils.sigmoid(2.)]),
+              ),
+          )
+      ),
+      (
+          'jax_nn_softplus_ndarray',
+          jax.nn.softplus,
+          0,
+          np.array([0., 1.]),
+          (np.array([-1., -2.]), np.array([1., 2.])),
+          False,
+          (
+              (
+                  np.array([test_utils.softplus(-1.),
+                            test_utils.softplus(-2.)]),
+                  np.array([test_utils.softplus(1.), test_utils.softplus(2.)])
+              ),
+          )
+      ),
+      (
+          'jax_nn_swish_ndarray',
+          jax.nn.swish,
+          0,
+          np.array([2., 3.]),
+          (np.array([1., 2.]), np.array([3., 4.])),
+          False,
+          (
+              (
+                  np.array([test_utils.swish(1.), test_utils.swish(2.)]),
+                  np.array([test_utils.swish(3.), test_utils.swish(4.)])
+              ),
+          )
       ),
   )
   def test_taylor_bounds(

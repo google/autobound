@@ -1,4 +1,4 @@
-# Copyright 2022 The autobound Authors.
+# Copyright 2023 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,14 +25,17 @@ from autobound import primitive_enclosures
 from autobound import types
 from autobound.jax import jaxpr_editor
 import jax
-from jax._src import abstract_arrays
 import jax.numpy as jnp
 
 
 @dataclasses.dataclass
 class TaylorBounds:
   """Upper and lower bounds on a function, valid over a trust region."""
+  f: Callable[[jnp.array], jnp.array]
   x0: jnp.ndarray
+  # Interval containing values of x (not x-x0) for which the bound on f(x)
+  # holds.
+  x_trust_region: Tuple[jnp.array, jnp.array]
   coefficients: types.TaylorEnclosure
 
   def __call__(self,
@@ -171,7 +174,7 @@ def taylor_bounds(
             #
             # TODO(mstreeter): add a test case that fails if we remove this.
             y0 = outvar_enclosures[i][0]
-            outvar_trust_regions[i] = (jnp.minimum(y0, a), jnp.maximum(y0, b))
+            outvar_trust_regions[i] = (jnp.minimum(y0, a), jnp.maximum(y0, b))  # pytype: disable=wrong-arg-types
         else:
           outvar_trust_regions = (None,) * len(outvar_enclosures)
         assert all(isinstance(v, tuple) for v in outvar_enclosures), (
@@ -200,7 +203,7 @@ def taylor_bounds(
 
     assert len(jaxpr.outvars) == 1
     output_intermediate = get_intermediate(jaxpr.outvars[0])
-    return TaylorBounds(x0=x0,
+    return TaylorBounds(f=f, x0=x0, x_trust_region=x_trust_region,
                         coefficients=output_intermediate.enclosure)
 
   return bound_fun
@@ -256,7 +259,7 @@ def _register_elementwise_function(
   _PRIMITIVE_NAMES.add(name)
   p = jax.core.Primitive(name)
   p.def_abstract_eval(
-      lambda x: abstract_arrays.ShapedArray(x.shape, x.dtype, weak_type=True))
+      lambda x: jax.abstract_arrays.ShapedArray(x.shape, x.dtype))
   rule = lambda: (jax.make_jaxpr(f)(0.).jaxpr, jax.make_jaxpr(p.bind)(0.).jaxpr)
   _JAXPR_REWRITE_RULES.append(rule)
   register_elementwise_primitive(p, get_enclosure)
@@ -419,7 +422,7 @@ def _intersect_intervals(
     a: types.Interval, b: types.Interval) -> types.Interval:
   if not len(a) == len(b) == 2:
     raise ValueError()
-  return (jnp.maximum(a[0], b[0]), jnp.minimum(a[1], b[1]))
+  return (jnp.maximum(a[0], b[0]), jnp.minimum(a[1], b[1]))  # pytype: disable=wrong-arg-types
 
 
 def _pass_thru_pushforward_fun(primitive):

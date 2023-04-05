@@ -15,7 +15,7 @@ keywords = []
 
 # pip dependencies of the project
 dependencies = [
-    "jax"
+    "jax>=0.4.6"
 ]
 
 # This is set automatically by flit using `autobound.__version__`
@@ -30,6 +30,7 @@ repository = "https://github.com/google/autobound"
 # Development deps (unittest, linting, formating,...)
 # Installed through `pip install .[dev]`
 dev = [
+    "flax>=0.6.7",
     "pytest",
     "pytest-xdist",
     "pylint>=2.6.0",

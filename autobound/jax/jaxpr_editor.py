@@ -1,4 +1,4 @@
-# Copyright 2022 The autobound Authors.
+# Copyright 2023 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 """Library for editing JAX expressions (Jaxprs)."""
 
 import itertools
+import types
 from typing import Any, Tuple, Union
 
 from autobound import graph_editor
@@ -198,26 +199,42 @@ def _can_bind(u, v):
     return (not v[0]) and (u[1] == v[1])
 
 
+# Set of Jaxpr equation params we ignore for matching purposes.
+_JAXPR_EQN_PARAMS_TO_IGNORE = frozenset(['weak_type'])
+
+
 def _jaxpr_eqn_params_equiv(p0, p1) -> bool:
+  """Returns whether two Jaxpr equation params dicts are equivalent."""
   if set(p0.keys()) != set(p1.keys()):
     return False
   for k0, v0 in p0.items():
+    if k0 in _JAXPR_EQN_PARAMS_TO_IGNORE:
+      continue
     v1 = p1[k0]
     if isinstance(v0, jax.core.ClosedJaxpr):
       # TODO(mstreeter): this could incorrectly return True if v0.consts and
       # v1.consts are different.
-      if not _same_jaxpr_up_to_variable_renaming(v0.jaxpr, v1.jaxpr):
+      if not _same_jaxpr_up_to_variable_renaming(v0.jaxpr, v1.jaxpr,
+                                                 ignore_shape=True):
         return False
     elif isinstance(v0, jax.core.Jaxpr):
-      if not _same_jaxpr_up_to_variable_renaming(v0, v1):
+      if not _same_jaxpr_up_to_variable_renaming(v0, v1, ignore_shape=True):
+        return False
+    elif isinstance(v0, types.FunctionType):
+      if not isinstance(v1, types.FunctionType):
         return False
     elif v0 != v1:
       return False
   return True
 
 
+def _match_avals(a0, a1, ignore_shape):
+  return a0.dtype == a1.dtype and (ignore_shape or (a0.shape == a1.shape))
+
+
 def _same_jaxpr_up_to_variable_renaming(j0: jax.core.Jaxpr,
-                                        j1: jax.core.Jaxpr) -> bool:
+                                        j1: jax.core.Jaxpr,
+                                        ignore_shape: bool = False) -> bool:
   """Return whether to Jaxprs are identical up to variable renaming."""
   var_map = {}
   def check(v0, v1):
@@ -226,7 +243,7 @@ def _same_jaxpr_up_to_variable_renaming(j0: jax.core.Jaxpr,
               v0.aval == v1.aval)
     elif isinstance(v0, jax.core.Var):
       if v0 not in var_map:
-        if v0.aval == v1.aval:
+        if _match_avals(v0.aval, v1.aval, ignore_shape):
           var_map[v0] = v1
           return True
         else:
