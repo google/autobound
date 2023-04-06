@@ -1,5 +1,6 @@
 # AutoBound: Automatically Bounding Functions
 
+![Continuous integration](https://github.com/google/autobound/actions/workflows/ci-build.yaml/badge.svg)
 ![PyPI version](https://img.shields.io/pypi/v/autobound)
 
 AutoBound is a generalization of automatic differentiation.  In addition to
