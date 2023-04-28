@@ -195,6 +195,8 @@ def taylor_bounds(
       assert len(outvar_intermediates) == len(eqn.outvars), (
           eqn.primitive, len(outvar_intermediates), len(eqn.outvars))
       for var, intermediate in zip(eqn.outvars, outvar_intermediates):
+        if var.count == -1:
+          continue  # skip unused output variables
         assert var not in var_to_intermediate
         assert isinstance(intermediate.enclosure, tuple), (
             eqn.primitive, intermediate)

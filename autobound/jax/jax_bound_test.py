@@ -547,6 +547,15 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
               ),
           )
       ),
+      (
+          'multiple_unused_output_variables',
+          lambda x: jax.grad(lambda x: x**2)(x) + jax.grad(lambda x: x**2)(x),
+          0,
+          0.,
+          (0., 1.),
+          False,
+          ((0., 4.),)
+      ),
   )
   def test_taylor_bounds(
       self, f, max_degree, test_x0, test_trust_region, propagate_trust_regions,
