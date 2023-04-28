@@ -15,7 +15,6 @@
 """Base class for unit tests."""
 
 import math
-from typing import List
 
 from absl.testing import absltest
 from autobound import types
@@ -110,7 +109,7 @@ class TestCase(absltest.TestCase):
     cls.backends = _get_backends()
 
 
-def _get_backends() -> List[types.NumpyLike]:
+def _get_backends() -> list[types.NumpyLike]:
   """Returns list of NumpyLike back ends to test."""
   backends = [np]
 

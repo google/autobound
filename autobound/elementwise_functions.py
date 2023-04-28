@@ -18,7 +18,7 @@ import dataclasses
 import functools
 import math
 
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Optional, Sequence
 # pylint: disable=g-multiple-import
 from autobound.types import (Interval, IntervalLike, NDArray, NDArrayLike,
                              NumpyLike)
@@ -53,8 +53,8 @@ class FunctionData:
   """An object that lists properties of a one-dimensional function."""
   # The lists of local minima and maxima include all minima/maxima over the
   # domain of the function, in ascending order.
-  local_minima: Tuple[float, ...]
-  local_maxima: Tuple[float, ...]
+  local_minima: tuple[float, ...]
+  local_maxima: tuple[float, ...]
   monotonically_decreasing: bool = False
   monotonically_increasing: bool = False
   even_symmetric: bool = False  # whether f(x) = f(-x) for all x.
@@ -62,7 +62,7 @@ class FunctionData:
   def monotone_over(
       self,
       region: IntervalLike,
-      np_like: NumpyLike) -> Tuple[NDArray, NDArray]:
+      np_like: NumpyLike) -> tuple[NDArray, NDArray]:
     """Returns ndarrays showing whether the function is monotone over `region`.
 
     Args:
@@ -180,7 +180,7 @@ def get_taylor_polynomial_coefficients(
     function_id: FunctionId,
     degree: int,
     x0: NDArray,
-    np_like: NumpyLike) -> List[NDArray]:
+    np_like: NumpyLike) -> list[NDArray]:
   """Returns the Taylor polynomial coefficients for a given function at `x0`.
 
   Args:
@@ -237,7 +237,7 @@ def _get_range(f,
                x_max: NDArray,
                local_minima: Sequence[float],
                local_maxima: Sequence[float],
-               np_like: NumpyLike) -> Tuple[NDArray, NDArray]:
+               np_like: NumpyLike) -> tuple[NDArray, NDArray]:
   minval = minimum_value(f, x_min, x_max, local_minima, np_like)
   maxval = maximum_value(f, x_min, x_max, local_maxima, np_like)
   return (minval, maxval)

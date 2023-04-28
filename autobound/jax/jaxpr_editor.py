@@ -16,7 +16,7 @@
 
 import itertools
 import types
-from typing import Any, Tuple, Union
+from typing import Any, Union
 
 from autobound import graph_editor
 import jax
@@ -110,10 +110,10 @@ class _EqnData:
 _IntermediateVariable = Union[
     # If the first element of the tuple is True, then the tuple represents
     # a jax.core.Var, and is of the form (True, count, suffix, aval).
-    Tuple[bool, int, str, jax.core.AbstractValue],
+    tuple[bool, int, str, jax.core.AbstractValue],
     # If the first element of the tuple is False, then the tuple represents
     # a jax.core.Literal, and is of the form (False, val, aval).
-    Tuple[bool, Any, jax.core.AbstractValue]
+    tuple[bool, Any, jax.core.AbstractValue]
 ]
 
 

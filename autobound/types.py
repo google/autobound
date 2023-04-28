@@ -15,20 +15,20 @@
 """Core types used in this package."""
 
 import abc
-from typing import List, NewType, Tuple, Union
+from typing import NewType, Union
 import typing_extensions
 
 
 # An interval is represented as a pair (a, b) of NDArrays of the same shape.
 # It represents the set of NDArrays {x: a <= x <= b}, where the inequalities
 # are elementwise.
-Interval = Tuple['NDArray', 'NDArray']
+Interval = tuple['NDArray', 'NDArray']
 
 
 # A polynomial whose coefficients can be either NDArrays or Intervals.  The
 # mathematical formula for the polynomial can be different for different types
 # of polynomials (see below).
-IntervalPolynomial = Tuple[Union['NDArray', Interval], ...]
+IntervalPolynomial = tuple[Union['NDArray', Interval], ...]
 
 
 # A degree d Taylor enclosure is a polynomial, represented as a tuple of
@@ -81,8 +81,8 @@ ElementwiseTaylorEnclosure = NewType('ElementwiseTaylorEnclosure',
 NDArrayLike = Union['NDArray', int, float]
 
 # Similar types for Intervals, etc.
-IntervalLike = Tuple[NDArrayLike, NDArrayLike]
-IntervalPolynomialLike = Tuple[Union[NDArrayLike, IntervalLike], ...]
+IntervalLike = tuple[NDArrayLike, NDArrayLike]
+IntervalPolynomialLike = tuple[Union[NDArrayLike, IntervalLike], ...]
 TaylorEnclosureLike = IntervalPolynomialLike
 ElementwiseTaylorEnclosureLike = IntervalPolynomialLike
 
@@ -302,7 +302,7 @@ class NumpyLike(typing_extensions.Protocol):
   @abc.abstractmethod
   def bool_(self, *args, **kwargs): pass
   @abc.abstractmethod
-  def broadcast_arrays(self, *args) -> List[NDArray]: pass
+  def broadcast_arrays(self, *args) -> list[NDArray]: pass
   @abc.abstractmethod
   def broadcast_to(self, *args, **kwargs): pass
   @abc.abstractmethod

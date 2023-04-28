@@ -20,7 +20,7 @@ support other multivariate functions.
 
 import functools
 import math
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Sequence
 
 from autobound import elementwise_functions
 # pylint: disable=g-multiple-import
@@ -188,7 +188,7 @@ def pow_enclosure(exponent: float,
 def bounded_derivative_enclosure(
     degree: int,
     taylor_coefficients_at_x0: Sequence[NDArray],
-    derivative_bound: Tuple[NDArray, NDArray]
+    derivative_bound: tuple[NDArray, NDArray]
 ) -> ElementwiseTaylorEnclosure:
   if len(taylor_coefficients_at_x0) != degree:
     raise ValueError()

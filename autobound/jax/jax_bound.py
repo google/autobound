@@ -16,7 +16,7 @@
 
 import dataclasses
 import functools
-from typing import Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Callable, Optional, Union
 
 from autobound import enclosure_arithmetic
 from autobound import interval_arithmetic
@@ -35,7 +35,7 @@ class TaylorBounds:
   x0: jnp.ndarray
   # Interval containing values of x (not x-x0) for which the bound on f(x)
   # holds.
-  x_trust_region: Tuple[jnp.array, jnp.array]
+  x_trust_region: tuple[jnp.array, jnp.array]
   coefficients: types.TaylorEnclosure
 
   def __call__(self,
@@ -43,7 +43,7 @@ class TaylorBounds:
     x = jnp.asarray(x)
     return polynomials.eval_taylor_enclosure(self.coefficients, x-self.x0, jnp)
 
-  def final_interval(self) -> Tuple[jnp.array, jnp.array]:
+  def final_interval(self) -> tuple[jnp.array, jnp.array]:
     """Returns final coefficient (as a trivial interval, if it is scalar)."""
     c = self.coefficients[-1]
     return c if isinstance(c, tuple) else (c, c)
@@ -61,7 +61,7 @@ def taylor_bounds(
     f: Callable[[jnp.array], jnp.array],
     max_degree: int,
     propagate_trust_regions: bool = False,
-) -> Callable[[jnp.array, Tuple[jnp.array, jnp.array]], TaylorBounds]:
+) -> Callable[[jnp.array, tuple[jnp.array, jnp.array]], TaylorBounds]:
   """Returns version of f that returns a TaylorBounds object.
 
   Args:
@@ -238,14 +238,14 @@ def register_elementwise_primitive(
 #
 
 
-_PRIMITIVE_NAMES = set()  # type: Set[str]
+_PRIMITIVE_NAMES = set()  # type: set[str]
 # Rewrite rules are callables that return (pattern Jaxpr, replacement Jaxpr)
 # pairs.  We make them callables because the Jaxpr returned by jax.make_jaxpr
 # depends on how Jax is configured (in particular whether float64 is enabled),
 # and we need to use the Jaxprs that match whatever configuration is being
 # used when the rule is applied.
 _JAXPR_REWRITE_RULES = [
-]  # type: List[Callable[[], Tuple[jax.core.Jaxpr, jax.core.Jaxpr]]]
+]  # type: list[Callable[[], tuple[jax.core.Jaxpr, jax.core.Jaxpr]]]
 
 
 def _register_elementwise_function(
@@ -440,13 +440,13 @@ def _pass_thru_pushforward_fun(primitive):
 # in the special case N=1, a single TaylorEnclosure rather than a tuple).
 PushforwardFunction = Callable[
     ...,
-    Union[types.TaylorEnclosure, Tuple[types.TaylorEnclosure, ...]]
+    Union[types.TaylorEnclosure, tuple[types.TaylorEnclosure, ...]]
 ]
 
 
 def _pushforward_funs(
     arithmetic: enclosure_arithmetic.TaylorEnclosureArithmetic
-) -> Dict[jax.core.Primitive, PushforwardFunction]:
+) -> dict[jax.core.Primitive, PushforwardFunction]:
   """Returns dict from primitive to function that inputs/outputs enclosures."""
   def pushforward_integer_pow(intermediate, y: int):
     return arithmetic.power(intermediate.enclosure, y)

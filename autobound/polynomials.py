@@ -16,7 +16,7 @@
 
 import math
 import operator
-from typing import Callable, Iterator, Sequence, Tuple, TypeVar, Union
+from typing import Callable, Iterator, Sequence, TypeVar, Union
 
 from autobound import interval_arithmetic
 from autobound import types
@@ -83,7 +83,7 @@ def arbitrary_bilinear(
     additive_identity: Foo = 0,
     term_product_coefficient: Callable[[FooLike, FooLike, int, int], Foo]
     = lambda c0, c1, i, j: c0*c1,
-) -> Tuple[Foo, ...]:
+) -> tuple[Foo, ...]:
   """Applies an arbitrary bilinear operation to two polynomials.
 
   The arguments a and b give the coefficients of polynomials, defined in terms
@@ -134,7 +134,7 @@ def integer_power(
     term_power_coefficient: Callable[[FooLike, int, int], Foo]
     = lambda c, i, j: c**j,
     scalar_product: Callable[[int, FooLike], Foo] = operator.mul
-) -> Tuple[Foo, ...]:
+) -> tuple[Foo, ...]:
   """Returns the coefficients of a polynomial raised to a power.
 
   The arguments a gives the coefficients of a polynomial, defined in terms
@@ -225,7 +225,7 @@ def integer_power(
 
 
 def _iter_partitions(
-    n: int, m: int, k: int) -> Iterator[Tuple[int, ...]]:
+    n: int, m: int, k: int) -> Iterator[tuple[int, ...]]:
   """Yields length-k tuples with sum m and sum_{j=1}^k (j-1)*i_j == n."""
   if n < 0:
     raise ValueError(n)

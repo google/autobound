@@ -2,7 +2,7 @@
 name = "autobound"
 description = ""
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 license = {file = "LICENSE"}
 authors = [{name = "AutoBound authors", email="autobound@google.com"}]
 classifiers = [

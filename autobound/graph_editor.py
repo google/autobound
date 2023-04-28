@@ -23,8 +23,7 @@ like editing Jaxprs.
 
 import dataclasses
 import itertools
-from typing import (Any, Callable, Dict, Hashable, Mapping, Optional, Sequence,
-                    Set)
+from typing import Any, Callable, Hashable, Mapping, Optional, Sequence
 
 # An intermediate variable in a computation graph (e.g., representing a tensor).
 IntermediateVariable = Hashable
@@ -51,7 +50,7 @@ class ComputationGraph:
   operations: Sequence[Operation]
   data: Any = None  # Any global data associated with the graph.
 
-  def intermediate_variables(self) -> Set[IntermediateVariable]:
+  def intermediate_variables(self) -> set[IntermediateVariable]:
     intvars = set(self.inputs)
     intvars.update(self.outputs)
     for op in self.operations:
@@ -64,7 +63,7 @@ def match(
     pattern: Sequence[Operation],
     subject: Sequence[Operation],
     can_bind: Callable[[IntermediateVariable, IntermediateVariable], bool]
-) -> Optional[Dict[IntermediateVariable, IntermediateVariable]]:
+) -> Optional[dict[IntermediateVariable, IntermediateVariable]]:
   """Checks whether a pattern matches a subject, and returns mapping if so.
 
   Args:
