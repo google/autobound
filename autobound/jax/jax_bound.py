@@ -271,8 +271,15 @@ def _register_elementwise_function(
 # TODO(mstreeter): support more elementwise functions.
 _ELEMENTWISE_PRIMITIVE_ENCLOSURES = {
     jax.lax.abs_p: primitive_enclosures.abs_enclosure,
+    jax.lax.cbrt_p: (
+        functools.partial(primitive_enclosures.pow_enclosure, 1/3)),
     jax.lax.exp_p: primitive_enclosures.exp_enclosure,
     jax.lax.log_p: primitive_enclosures.log_enclosure,
+    jax.lax.logistic_p: primitive_enclosures.sigmoid_enclosure,
+    jax.lax.rsqrt_p: (
+        functools.partial(primitive_enclosures.pow_enclosure, -.5)),
+    jax.lax.sqrt_p: (
+        functools.partial(primitive_enclosures.pow_enclosure, .5)),
 }
 _register_elementwise_function(jax.nn.sigmoid,
                                primitive_enclosures.sigmoid_enclosure)

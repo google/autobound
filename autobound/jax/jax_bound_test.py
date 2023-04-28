@@ -349,6 +349,34 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
            (1 - (2**.5 - .5/2**.5), 3**.5 - (2**.5 + .5/2**.5)))
       ),
       (
+          'sqrt_p',
+          jax.lax.sqrt_p.bind,
+          2,
+          2.,
+          (1, 3),
+          False,
+          (2**.5, .5 / 2**.5,
+           (1 - (2**.5 - .5/2**.5), 3**.5 - (2**.5 + .5/2**.5)))
+      ),
+      (
+          'cbrt_p',
+          jax.lax.cbrt_p.bind,
+          0,
+          2.,
+          (1, 3),
+          False,
+          ((1., 3**(1/3)),)
+      ),
+      (
+          'rsqrt_p',
+          jax.lax.rsqrt_p.bind,
+          0,
+          2.,
+          (1, 3),
+          False,
+          ((3**(-.5), 1.),)
+      ),
+      (
           'multiply_b',
           lambda x: x * jnp.array([[1], [2]]),
           2,
@@ -477,6 +505,15 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           )
       ),
       # TODO(mstreeter): test convolutions where the input is not a scalar.
+      (
+          'logistic_p',
+          jax.lax.logistic_p.bind,
+          0,
+          0.,
+          (-1., 1.),
+          False,
+          ((test_utils.sigmoid(-1.), test_utils.sigmoid(1.)),)
+      ),
       (
           'jax_nn_sigmoid',
           jax.nn.sigmoid,
