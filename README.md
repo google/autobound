@@ -26,7 +26,7 @@ f = lambda x: 1.5*jnp.exp(3*x) - 25*x**2
 x0 = .5
 trust_region = (0, 1)
 # Compute quadratic upper and lower bounds on f.
-bounds = ab.taylor_bounds(f, 2)(x0, trust_region)
+bounds = ab.taylor_bounds(f, max_degree=2)(x0, trust_region)
 # bounds.upper(1) == 5.1283045 == f(1)
 # bounds.lower(0) == 1.5 == f(0)
 # bounds.coefficients == (0.47253323, -4.8324013, (-5.5549355, 28.287888))

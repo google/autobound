@@ -15,7 +15,8 @@ keywords = []
 
 # pip dependencies of the project
 dependencies = [
-    "jax>=0.4.6"
+    "jax>=0.4.6",
+    "typing_extensions>=4.4.0",
 ]
 
 # This is set automatically by flit using `autobound.__version__`
@@ -36,7 +37,6 @@ dev = [
     "pytest-xdist",
     "pylint>=2.6.0",
     "pyink",
-    "typing_extensions>=4.4.0",
 ]
 
 [tool.pyink]
