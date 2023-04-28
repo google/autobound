@@ -115,6 +115,35 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           raise NotImplementedError(i)
       return expected_coefficients
 
+  @parameterized.parameters(
+      # Test p==0.  0th deriv is 1, higher derivs are 0.
+      (1, 0, 0, 1),
+      (-1, 0, 0, 1),
+      (1, 0, 1, 0),
+      (-1, 0, 1, 0),
+      (1, 2, 3, 0),
+      (-1, 2, 3, 0),
+      # Test p==1.
+      (1, 1, 0, 1),
+      (1, 1, 1, 1),
+      (1, 1, 2, 0),
+      (-1, 1, 0, -1),
+      (-1, 1, 1, 1),
+      (-1, 1, 2, 0),
+      # Test p==2.
+      (1, 2, 0, 1),
+      (1, 2, 1, 1),
+      (1, 2, 2, 1),
+      (1, 2, 3, 0),
+      (-1, 2, 0, 1),
+      (-1, 2, 1, -1),
+      (-1, 2, 2, 1),
+      (-1, 2, 3, 0),
+  )
+  def test_pow_kth_deriv_sign(self, x_sign, p, k, expected):
+    actual = primitive_enclosures._pow_kth_deriv_sign(x_sign, p, k)
+    self.assertEqual(expected, actual)
+
   @parameterized.named_parameters(
       (
           'abs_1',
@@ -497,6 +526,15 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           # R_1(0; sqrt, 2) / (0 - 2)**2 = [-sqrt(2) + 1 / sqrt(2)] / 4.
           (2**.5, .5 / 2**.5,
            ((-2**.5 + 1/2**.5) / 4, 3**.5 - (2**.5 + .5/2**.5))),
+      ),
+      (
+          'cbrt',
+          lambda x: x**(1/3),
+          functools.partial(primitive_enclosures.pow_enclosure, 1/3),
+          2.5,
+          (2., 3.),
+          0,
+          ((2**(1/3), 3**(1/3)),),
       ),
       # TODO(mstreeter): test enclosure for sqrt(x) when trust region includes
       # negative values.

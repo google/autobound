@@ -114,30 +114,23 @@ def pow_enclosure(exponent: float,
                   degree: int,
                   np_like: NumpyLike) -> ElementwiseTaylorEnclosure:
   """Returns an ElementwiseTaylorEnclosure for x**exponent in terms of x-x0."""
-  # The kth derivative of x**p is p * (p-1) * ... * (p-k) * x0**(p-k)
   taylor_coefficients_at_x0 = []
   c = 1.
-  i_factorial = 1.
   for i in range(degree + 1):
-    if i > 0:
-      i_factorial *= i
     # Note: the next line can sometimes generate bogus RuntimeWarnings when
     # using Numpy.  This seems to be a bug in Numpy, as even doing
     # np.array(2.)**-1 generates the same RuntimeWarning.
-    taylor_coefficients_at_x0.append(c * x0**(exponent - i) / i_factorial)
-    if i < degree:
-      c *= exponent - i
+    taylor_coefficients_at_x0.append(c * x0**(exponent - i) / math.factorial(i))
+    c *= exponent - i
 
-  # Compute sharp enclosures for two cases: x-x0 > 0 (enc_pos below), and
-  # x-x0 < 0 (enc_neg below).
+  # Compute sharp enclosures of x**exponent for the case x > 0 (enc_pos below),
+  # and the case x < 0 (enc_neg below).
   #
-  # The kth derivative of x**p at x is c*x**(p-k), where c
-  # is negative if k is odd, and positive if k is even.
-  # For x > 0, c*x**(p-k) is decreasing if c is positive, and
-  # decreasing otherwise.
-  # For x < 0 and even p-k, the situation is the same.
-  # For x < 0 and odd p-k, the situation is reversed: c*x**(p-k) is increasing
-  # if c is positive and decreasing otherwise.
+  # In each of these cases, the (degree)th derivative of x**exponent will
+  # either be monotonically increasing or monotonically decreasing.  Compute
+  # the sharp enclosures for both cases (increasing or decreasing), then use
+  # the sign of the (degree+1)st derivative to determine which one works for
+  # the cases x > 0 and x < 0.
   # pylint: disable=g-complex-comprehension
   enc_decreasing, enc_increasing = [
       sharp_enclosure_monotonic_derivative(
@@ -146,36 +139,43 @@ def pow_enclosure(exponent: float,
       )
       for increasing in [False, True]
   ]
-  enc_pos = enc_decreasing if c > 0 else enc_increasing
-  if exponent - degree % 2 == 0:
-    enc_neg = enc_pos
+  enc_pos = (enc_increasing if _pow_kth_deriv_sign(1, exponent, degree+1) >= 0
+             else enc_decreasing)
+  if int(exponent) != exponent:
+    enc_neg = None
   else:
-    enc_neg = enc_increasing if c > 0 else enc_decreasing
+    enc_neg = (enc_increasing
+               if _pow_kth_deriv_sign(-1, exponent, degree+1) >= 0
+               else enc_decreasing)
 
   def interval_endpoint(i):
     """Returns left (i == 0) or right (i == 1) endpoint of interval."""
     a, b = trust_region
-    endpoint_if_positive = enc_pos[-1][i]
+    # For each index i, the interval between a[i] and b[i] either contains zero,
+    # or contains only positive values, or contains only negative values.
+    # Compute the endpoints for all three cases, and combine the results using
+    # np_like.where().
+    endpoint_if_always_positive = enc_pos[-1][i]
     if int(exponent) != exponent:
       # If exponent is not an integer, then z**exponent is undefined for z < 0.
       # We return the interval (-inf, inf) in this case.
-      endpoint_if_negative = -np_like.inf if i == 0 else np_like.inf
-      endpoint_if_possibly_zero = endpoint_if_negative
+      endpoint_if_always_negative = -np_like.inf if i == 0 else np_like.inf
+      endpoint_if_possibly_zero = endpoint_if_always_negative
     elif exponent < 0:
-      endpoint_if_negative = enc_neg[-1][i]
+      endpoint_if_always_negative = enc_neg[-1][i]
       endpoint_if_possibly_zero = -np_like.inf if i == 0 else np_like.inf
     else:
-      endpoint_if_negative = enc_neg[-1][i]
+      endpoint_if_always_negative = enc_neg[-1][i]
       endpoint_if_possibly_zero = functools.reduce(
           np_like.minimum if i == 0 else np_like.maximum,
-          [endpoint_if_positive, endpoint_if_negative]
+          [endpoint_if_always_positive, endpoint_if_always_negative]
       )
     return np_like.where(
         a >= 0,
-        endpoint_if_positive,
+        endpoint_if_always_positive,
         np_like.where(
             b <= 0,
-            endpoint_if_negative,
+            endpoint_if_always_negative,
             endpoint_if_possibly_zero
         )
     )
@@ -303,3 +303,24 @@ def taylor_remainder_ratio(
       # when denom is very small.
       r_k * np_like.sign(denom) / (np_like.maximum(1e-12, np_like.abs(denom)))
   )
+
+
+def _pow_kth_deriv_sign(x_sign: int, p: float, k: int) -> int:
+  """Return sign of kth derivative of x**p, for x with given sign."""
+  # The kth derivative of x**p at p * (p-1) * ... * (p-k) * x**(p-k)
+  # == c * x**(p-k), for c computed below.
+  c = 1.
+  for i in range(k):
+    c *= p - i
+
+  sign = lambda z: 1 if z > 0 else (0 if z == 0 else -1)
+
+  if x_sign == 1:
+    return sign(c)
+  elif x_sign == -1:
+    if p == int(p):
+      return sign(c) * (1 if (p - k) % 2 == 0 else -1)
+    else:
+      raise ValueError('x**p undefined for non-integer p when x < 0')
+  else:
+    raise ValueError(x_sign)
