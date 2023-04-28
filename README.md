@@ -65,6 +65,30 @@ pip install autobound
 
 You may need to [upgrade pip](https://pip.pypa.io/en/stable/installation/#upgrading-pip) before running these commands.
 
+## Testing
+
+To run unit tests, first install the packages the unit tests depend on with
+
+```bash
+pip install autobound[dev]
+```
+
+As above, you may need to [install](https://pip.pypa.io/en/stable/installation/) or [upgrade](https://pip.pypa.io/en/stable/installation/#upgrading-pip) `pip` before running this command.
+
+Then, download the source code and run the tests using
+
+```bash
+git clone https://github.com/google/autobound.git
+python3 -m pytest autobound
+```
+
+or
+
+```bash
+pip install -e git+https://github.com/google/autobound.git#egg=autobound
+python3 -m pytest src/autobound
+```
+
 ## Limitations
 
 The current code has a few limitations:
