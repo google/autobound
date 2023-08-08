@@ -328,7 +328,8 @@ class TaylorEnclosureArithmetic:
       term_power_coefficient = functools.partial(
           _elementwise_term_power_coefficient, x_ndim=x_ndim,
           np_like=self.np_like)
-      multiplicative_identity = self.np_like.ones_like(self.trust_region[0])
+      a0 = a[0][0] if isinstance(a[0], tuple) else a[0]
+      multiplicative_identity = self.np_like.ones_like(a0)
       result = polynomials.integer_power(  # pytype: disable=wrong-arg-types
           a,
           p,
