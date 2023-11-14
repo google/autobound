@@ -31,11 +31,11 @@ import jax.numpy as jnp
 @dataclasses.dataclass
 class TaylorBounds:
   """Upper and lower bounds on a function, valid over a trust region."""
-  f: Callable[[jnp.array], jnp.array]
+  f: Callable[[jnp.ndarray], jnp.ndarray]
   x0: jnp.ndarray
   # Interval containing values of x (not x-x0) for which the bound on f(x)
   # holds.
-  x_trust_region: tuple[jnp.array, jnp.array]
+  x_trust_region: types.Interval
   coefficients: types.TaylorEnclosure
 
   def __call__(self,
@@ -43,7 +43,7 @@ class TaylorBounds:
     x = jnp.asarray(x)
     return polynomials.eval_taylor_enclosure(self.coefficients, x-self.x0, jnp)
 
-  def final_interval(self) -> tuple[jnp.array, jnp.array]:
+  def final_interval(self) -> types.Interval:
     """Returns final coefficient (as a trivial interval, if it is scalar)."""
     c = self.coefficients[-1]
     return c if isinstance(c, tuple) else (c, c)
@@ -58,23 +58,22 @@ class TaylorBounds:
 
 
 def taylor_bounds(
-    f: Callable[[jnp.array], jnp.array],
+    f: Callable[[jnp.ndarray], jnp.ndarray],
     max_degree: int,
     propagate_trust_regions: bool = False,
-) -> Callable[[jnp.array, tuple[jnp.array, jnp.array]], TaylorBounds]:
+) -> Callable[[jnp.ndarray, tuple[jnp.ndarray, jnp.ndarray]], TaylorBounds]:
   """Returns version of f that returns a TaylorBounds object.
 
   Args:
-    f: a function that takes a jnp.array as input, and returns a jnp.array
-    max_degree: the maximum degree TaylorEnclosure for the returned function
-      to return
-    propagate_trust_regions: if True, trust regions are propagated
-      through the Jaxpr, rather than being computed from higher-degree
-      enclosures.  This results in tighter bounds at the cost of additional
-      memory.
+    f: a function that takes a jnp.ndarray as input, and returns a jnp.array
+    max_degree: the maximum degree TaylorEnclosure for the returned function to
+      return
+    propagate_trust_regions: if True, trust regions are propagated through the
+      Jaxpr, rather than being computed from higher-degree enclosures.  This
+      results in tighter bounds at the cost of additional memory.
 
   Returns:
-    a function that takes as input a jnp.array x0, and a trust region
+    a function that takes as input a jnp.ndarray x0, and a trust region
     (min_vals, max_vals), and return a TaylorBounds object `bound` such that
     `bound.coefficients` is a TaylorEnclosure g of degree at most max_degree,
     such that:
@@ -87,8 +86,9 @@ def taylor_bounds(
     propagate_trust_regions = False  # avoid redundant computation
 
   jaxpr_factory = jax.make_jaxpr(f)
-  def bound_fun(x0: jnp.array,
-                x_trust_region: types.Interval) -> TaylorBounds:
+  def bound_fun(
+      x0: jnp.ndarray, x_trust_region: types.Interval
+  ) -> TaylorBounds:
     trust_region = interval_arithmetic.IntervalArithmetic(jnp).subtract(
         x_trust_region, x0)
 
@@ -251,8 +251,8 @@ _JAXPR_REWRITE_RULES = [
 
 
 def _register_elementwise_function(
-    f: Callable[[jnp.array], jnp.array],
-    get_enclosure: ElementwiseEnclosureGeneratingFunction
+    f: Callable[[jnp.ndarray], jnp.ndarray],
+    get_enclosure: ElementwiseEnclosureGeneratingFunction,
 ):
   """Register enclosure-generating function for elementwise Jax function."""
   name = f'__autobound_{f.__name__}__'
@@ -261,7 +261,7 @@ def _register_elementwise_function(
   _PRIMITIVE_NAMES.add(name)
   p = jax.core.Primitive(name)
   p.def_abstract_eval(
-      lambda x: jax.abstract_arrays.ShapedArray(x.shape, x.dtype))
+      lambda x: jax.core.ShapedArray(x.shape, x.dtype))
   rule = lambda: (jax.make_jaxpr(f)(0.).jaxpr, jax.make_jaxpr(p.bind)(0.).jaxpr)
   _JAXPR_REWRITE_RULES.append(rule)
   register_elementwise_primitive(p, get_enclosure)
@@ -358,9 +358,11 @@ def _conv_general_dilated_pushforward_fun(arithmetic):
   def fun(lhs_intermediate: _IntermediateEnclosure,
           rhs_intermediate: _IntermediateEnclosure,
           **params):
-    def pairwise_batched_bilinear(a: jnp.array, b: jnp.array,
-                                  p: int, q: int) -> jnp.array:
-      def move_last_n_dims_to_front(x: jnp.array, n: int):
+
+    def pairwise_batched_bilinear(
+        a: jnp.ndarray, b: jnp.ndarray, p: int, q: int
+    ) -> jnp.ndarray:
+      def move_last_n_dims_to_front(x: jnp.ndarray, n: int):
         if n == 0:
           return x
         perm = tuple(range(x.ndim - n, x.ndim)) + tuple(range(x.ndim - n))
@@ -395,8 +397,9 @@ def _dot_general_pushforward_fun(arithmetic):
     a_contracting_dims = set(a  # pylint: disable=g-complex-comprehension
                              for t in params['dimension_numbers']
                              for a in t[0])
-    def pairwise_batched_bilinear(a: jnp.array, b: jnp.array,
-                                  p: int, q: int) -> jnp.array:
+    def pairwise_batched_bilinear(
+        a: jnp.ndarray, b: jnp.ndarray, p: int, q: int
+    ) -> jnp.ndarray:
       transposed_output = jax.lax.dot_general_p.bind(a, b, **params)
       p_start = a.ndim - p - len(a_contracting_dims)
       assert p_start >= 0
@@ -412,6 +415,7 @@ def _dot_general_pushforward_fun(arithmetic):
       )
       assert len(set(perm)) == n, (p_start, p, q, n, perm)
       return jnp.transpose(transposed_output, axes=perm)
+
     return arithmetic.arbitrary_bilinear(
         lhs_intermediate.enclosure,
         rhs_intermediate.enclosure,

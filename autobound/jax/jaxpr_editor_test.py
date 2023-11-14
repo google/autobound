@@ -22,7 +22,7 @@ import numpy as np
 
 softplus_p = jax.core.Primitive('__autobound_softplus__')
 softplus_p.def_abstract_eval(
-    lambda x: jax.abstract_arrays.ShapedArray(x.shape, x.dtype, weak_type=True))
+    lambda x: jax.core.ShapedArray(x.shape, x.dtype, weak_type=True))
 
 
 class TestCase(parameterized.TestCase):

@@ -29,7 +29,7 @@ import numpy as np
 # Custom softplus primitive, for use in testing registration mechanism.
 my_softplus_p = jax.core.Primitive('my_softplus')
 my_softplus_p.def_abstract_eval(
-    lambda x: jax.abstract_arrays.ShapedArray(x.shape, x.dtype))
+    lambda x: jax.core.ShapedArray(x.shape, x.dtype))
 
 
 def my_softplus(x):
