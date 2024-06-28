@@ -169,7 +169,11 @@ def _graph_to_jaxpr(h: graph_editor.ComputationGraph) -> jax.core.Jaxpr:
     if vertex[0]:
       _, count, suffix, aval = vertex
       if count not in count_to_var:
-        count_to_var[count] = jax.core.Var(count, suffix, aval)
+        if jax.__version__ >= '0.4.25':
+            # count argument was removed in jax 0.4.25: https://github.com/google/jax/pull/10573
+            count_to_var[count] = jax.core.Var(suffix, aval)
+        else:
+            count_to_var[count] = jax.core.Var(count, suffix, aval)
       return count_to_var[count]
     else:
       _, val, aval = vertex
