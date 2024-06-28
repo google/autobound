@@ -58,10 +58,10 @@ class TaylorBounds:
 
 
 def taylor_bounds(
-    f: Callable[[jnp.ndarray], jnp.ndarray],
+    f: Callable[[types.NDArrayLike], types.NDArrayLike],
     max_degree: int,
     propagate_trust_regions: bool = False,
-) -> Callable[[jnp.ndarray, tuple[jnp.ndarray, jnp.ndarray]], TaylorBounds]:
+) -> Callable[[types.NDArrayLike, tuple[types.NDArrayLike, types.NDArrayLike]], TaylorBounds]:
   """Returns version of f that returns a TaylorBounds object.
 
   Args:
