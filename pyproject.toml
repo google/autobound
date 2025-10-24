@@ -2,7 +2,7 @@
 name = "autobound"
 description = ""
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = {file = "LICENSE"}
 authors = [{name = "AutoBound authors", email="autobound@google.com"}]
 classifiers = [
@@ -15,7 +15,7 @@ keywords = []
 
 # pip dependencies of the project
 dependencies = [
-    "jax>=0.8.0",
+    "jax>=0.7.2",
     "typing_extensions>=4.4.0",
 ]
 
