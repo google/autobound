@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@ from typing import Any, Union
 
 from autobound import graph_editor
 import jax
+import jax.extend as jex
 
 
-def replace(pattern: jax.core.Jaxpr,
-            replacement: jax.core.Jaxpr,
-            subject: jax.core.Jaxpr) -> jax.core.Jaxpr:
+def replace(pattern: jex.core.Jaxpr,
+            replacement: jex.core.Jaxpr,
+            subject: jex.core.Jaxpr) -> jex.core.Jaxpr:
   """Replace occurrences of a pattern Jaxpr within a subject Jaxpr.
 
   This method return a `Jaxpr` that is an edited version of `subject`
@@ -104,20 +105,23 @@ class _EqnData:
   def __hash__(self):
     return hash(self.primitive)
 
+  def __repr__(self):
+    return f'_EqnData({self.primitive}, {self.params})'
 
-# An intermediate variable is a tuple that either represents a jax.core.Var or
-# a jax.core.Literal.
+
+# An intermediate variable is a tuple that either represents a jex.core.Var or
+# a jex.core.Literal.
 _IntermediateVariable = Union[
     # If the first element of the tuple is True, then the tuple represents
-    # a jax.core.Var, and is of the form (True, count, suffix, aval).
-    tuple[bool, int, str, jax.core.AbstractValue],
+    # a jex.core.Var, and is of the form (True, count, aval).
+    tuple[bool, int, jax.core.AbstractValue],
     # If the first element of the tuple is False, then the tuple represents
-    # a jax.core.Literal, and is of the form (False, val, aval).
+    # a jex.core.Literal, and is of the form (False, val, aval).
     tuple[bool, Any, jax.core.AbstractValue]
 ]
 
 
-def _jaxpr_to_graph(jaxpr: jax.core.Jaxpr,
+def _jaxpr_to_graph(jaxpr: jex.core.Jaxpr,
                     offset: int = 0) -> graph_editor.ComputationGraph:
   """Returns a ComputationGraph that represents a Jaxpr.
 
@@ -131,12 +135,12 @@ def _jaxpr_to_graph(jaxpr: jax.core.Jaxpr,
   """
 
   def get_intermediate_variable(
-      var_or_literal: Union[jax.core.Var, jax.core.Literal]
+      var_or_literal: Union[jex.core.Var, jex.core.Literal]
   ) -> _IntermediateVariable:
-    if isinstance(var_or_literal, jax.core.Var):
+    if isinstance(var_or_literal, jex.core.Var):
       var = var_or_literal
-      return (True, var.count + offset, var.suffix, var.aval)
-    elif isinstance(var_or_literal, jax.core.Literal):
+      return (True, var.count + offset, var.aval)
+    elif isinstance(var_or_literal, jex.core.Literal):
       literal = var_or_literal
       return (False, literal.val, literal.aval)
     else:
@@ -161,19 +165,22 @@ def _jaxpr_to_graph(jaxpr: jax.core.Jaxpr,
   )
 
 
-def _graph_to_jaxpr(h: graph_editor.ComputationGraph) -> jax.core.Jaxpr:
+def _graph_to_jaxpr(h: graph_editor.ComputationGraph) -> jex.core.Jaxpr:
   """Returns the Jaxpr represented by a ComputationGraph."""
   count_to_var = {}
 
   def vertex_to_var_or_literal(vertex):
+    assert isinstance(vertex, tuple)
     if vertex[0]:
-      _, count, suffix, aval = vertex
+      _, count, aval = vertex
       if count not in count_to_var:
-        count_to_var[count] = jax.core.Var(count, suffix, aval)
+        v = jex.core.Var(aval=aval)
+        v.count = count
+        count_to_var[count] = v
       return count_to_var[count]
     else:
       _, val, aval = vertex
-      return jax.core.Literal(val, aval)
+      return jex.core.Literal(val, aval)
 
   eqns = []
   for edge in h.operations:
@@ -189,18 +196,19 @@ def _graph_to_jaxpr(h: graph_editor.ComputationGraph) -> jax.core.Jaxpr:
   invars = [vertex_to_var_or_literal(v) for v in h.inputs]
   outvars = [vertex_to_var_or_literal(v) for v in h.outputs]
   constvars = [vertex_to_var_or_literal(v) for v in h.data]
-  return jax.core.Jaxpr(constvars, invars, outvars, eqns)
+  return jex.core.Jaxpr(constvars, invars, outvars, eqns)
 
 
-def _can_bind(u, v):
+def _can_bind(u, v) -> bool:
   if u[0]:
+    # A variable can bind to any other variable.
     return v[0]
   else:
     return (not v[0]) and (u[1] == v[1])
 
 
 # Set of Jaxpr equation params we ignore for matching purposes.
-_JAXPR_EQN_PARAMS_TO_IGNORE = frozenset(['weak_type'])
+_JAXPR_EQN_PARAMS_TO_IGNORE = frozenset(['weak_type', 'jvp_jaxpr_fun'])
 
 
 def _jaxpr_eqn_params_equiv(p0, p1) -> bool:
@@ -211,13 +219,13 @@ def _jaxpr_eqn_params_equiv(p0, p1) -> bool:
     if k0 in _JAXPR_EQN_PARAMS_TO_IGNORE:
       continue
     v1 = p1[k0]
-    if isinstance(v0, jax.core.ClosedJaxpr):
+    if isinstance(v0, jex.core.ClosedJaxpr):
       # TODO(mstreeter): this could incorrectly return True if v0.consts and
       # v1.consts are different.
       if not _same_jaxpr_up_to_variable_renaming(v0.jaxpr, v1.jaxpr,
                                                  ignore_shape=True):
         return False
-    elif isinstance(v0, jax.core.Jaxpr):
+    elif isinstance(v0, jex.core.Jaxpr):
       if not _same_jaxpr_up_to_variable_renaming(v0, v1, ignore_shape=True):
         return False
     elif isinstance(v0, types.FunctionType):
@@ -232,16 +240,29 @@ def _match_avals(a0, a1, ignore_shape):
   return a0.dtype == a1.dtype and (ignore_shape or (a0.shape == a1.shape))
 
 
-def _same_jaxpr_up_to_variable_renaming(j0: jax.core.Jaxpr,
-                                        j1: jax.core.Jaxpr,
+def _equiv_literals(l0: jex.core.Literal,
+                    l1: jex.core.Literal,
+                    ignore_shape: bool) -> bool:
+  if l0.val != l1.val:
+    return False
+  for name in ['dtype'] if ignore_shape else ['dtype', 'shape']:
+    if getattr(l0, name, None) != getattr(l1, name, None):
+      return False
+  return True
+
+
+def _same_jaxpr_up_to_variable_renaming(j0: jex.core.Jaxpr,
+                                        j1: jex.core.Jaxpr,
                                         ignore_shape: bool = False) -> bool:
-  """Return whether to Jaxprs are identical up to variable renaming."""
+  """Return whether two Jaxprs are identical up to variable renaming."""
   var_map = {}
   def check(v0, v1):
-    if isinstance(v0, jax.core.Literal):
-      return (isinstance(v1, jax.core.Literal) and v0.val == v1.val and
-              v0.aval == v1.aval)
-    elif isinstance(v0, jax.core.Var):
+    if isinstance(v0, jex.core.Literal):
+      #return isinstance(v1, jex.core.Literal) and v0.val == v1.val
+      if not isinstance(v1, jex.core.Literal):
+        return False
+      return _equiv_literals(v0, v1, ignore_shape)
+    elif isinstance(v0, jex.core.Var):
       if v0 not in var_map:
         if _match_avals(v0.aval, v1.aval, ignore_shape):
           var_map[v0] = v1

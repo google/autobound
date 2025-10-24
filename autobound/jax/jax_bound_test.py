@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,12 +22,13 @@ from autobound import test_utils
 from autobound.jax import jax_bound
 from flax import linen as nn
 import jax
+import jax.extend as jex
 import jax.numpy as jnp
 import numpy as np
 
 
 # Custom softplus primitive, for use in testing registration mechanism.
-my_softplus_p = jax.core.Primitive('my_softplus')
+my_softplus_p = jex.core.Primitive('my_softplus')
 my_softplus_p.def_abstract_eval(
     lambda x: jax.core.ShapedArray(x.shape, x.dtype))
 
@@ -47,7 +48,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           {
               'dimension_numbers': (((0,), (0,)), ((), ())),
               'precision': None,
-              'preferred_element_type': None
+              'preferred_element_type': None,
+              'out_sharding': None
           },
           (np.ones((13, 7)), np.ones((13, 7, 1)))
       ),
@@ -59,7 +61,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           {
               'dimension_numbers': (((1,), (0,)), ((), ())),
               'precision': None,
-              'preferred_element_type': None
+              'preferred_element_type': None,
+              'out_sharding': None
           },
           (5*np.ones((3, 7)), 5*np.ones((3, 7, 2)))
       ),
@@ -71,7 +74,8 @@ class TestCase(parameterized.TestCase, test_utils.TestCase):
           {
               'dimension_numbers': (((1,), (0,)), ((), ())),
               'precision': None,
-              'preferred_element_type': None
+              'preferred_element_type': None,
+              'out_sharding': None
           },
           (7*np.ones((5, 11)), 7*np.ones((5, 11, 2)))
       ),

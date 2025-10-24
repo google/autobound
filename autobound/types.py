@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -316,8 +316,6 @@ class NumpyLike(typing_extensions.Protocol):
   @abc.abstractmethod
   def complex64(self, *args, **kwargs): pass
   @abc.abstractmethod
-  def complex_(self, *args, **kwargs): pass
-  @abc.abstractmethod
   def compress(self, *args, **kwargs): pass
   @abc.abstractmethod
   def concatenate(self, *args, **kwargs): pass
@@ -397,8 +395,6 @@ class NumpyLike(typing_extensions.Protocol):
   def float32(self, *args, **kwargs): pass
   @abc.abstractmethod
   def float64(self, *args, **kwargs): pass
-  @abc.abstractmethod
-  def float_(self, *args, **kwargs): pass
   @abc.abstractmethod
   def float_power(self, *args, **kwargs): pass
   @abc.abstractmethod

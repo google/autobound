@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,17 +114,10 @@ def _get_backends() -> list[types.NumpyLike]:
   backends = [np]
 
   try:
-    from jax.config import config as jax_config
+    from jax import config as jax_config
     import jax.numpy as jnp
     backends.append(jnp)
     jax_config.update('jax_enable_x64', True)
-  except ModuleNotFoundError:
-    pass
-
-  try:
-    import tensorflow.experimental.numpy as tnp
-    tnp.experimental_enable_numpy_behavior()
-    backends.append(tnp)
   except ModuleNotFoundError:
     pass
 

@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@ from absl.testing import absltest
 from absl.testing import parameterized
 from autobound.jax import jaxpr_editor
 import jax
+import jax.extend as jex
 import jax.numpy as jnp
 import numpy as np
 
 
-softplus_p = jax.core.Primitive('__autobound_softplus__')
+softplus_p = jex.core.Primitive('__autobound_softplus__')
 softplus_p.def_abstract_eval(
     lambda x: jax.core.ShapedArray(x.shape, x.dtype, weak_type=True))
 

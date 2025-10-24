@@ -1,4 +1,4 @@
-# Copyright 2023 The autobound Authors.
+# Copyright 2025 The autobound Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ from autobound import primitive_enclosures
 from autobound import types
 from autobound.jax import jaxpr_editor
 import jax
+import jax.extend as jex
 import jax.numpy as jnp
 
 
@@ -124,11 +125,11 @@ def taylor_bounds(
     )
 
     def get_intermediate(
-        invar: Union[jax.core.Var, jax.core.Literal]) -> _IntermediateEnclosure:
-      if isinstance(invar, jax.core.Var):
+        invar: Union[jex.core.Var, jex.core.Literal]) -> _IntermediateEnclosure:
+      if isinstance(invar, jex.core.Var):
         return var_to_intermediate[invar]
       else:
-        assert isinstance(invar, jax.core.Literal)
+        assert isinstance(invar, jex.core.Literal)
         return _constant_intermediate_enclosure(invar.val)
 
     for eqn in jaxpr.eqns:
@@ -224,12 +225,12 @@ ElementwiseEnclosureGeneratingFunction = Callable[
 # TODO(mstreeter): add a mechanism for supporting a new elementwise function
 # given its FunctionData.
 def register_elementwise_primitive(
-    p: jax.core.Primitive,
+    p: jex.core.Primitive,
     get_enclosure: ElementwiseEnclosureGeneratingFunction):
   """Register an enclosure-generating function for a user-defined primitive.
 
   Args:
-    p: a jax.core.Primitive
+    p: a jex.core.Primitive
     get_enclosure: an ElementwiseEnclosureGeneratingFunction for p.
   """
   _ELEMENTWISE_PRIMITIVE_ENCLOSURES[p] = get_enclosure
@@ -247,7 +248,7 @@ _PRIMITIVE_NAMES = set()  # type: set[str]
 # and we need to use the Jaxprs that match whatever configuration is being
 # used when the rule is applied.
 _JAXPR_REWRITE_RULES = [
-]  # type: list[Callable[[], tuple[jax.core.Jaxpr, jax.core.Jaxpr]]]
+]  # type: list[Callable[[], tuple[jex.core.Jaxpr, jex.core.Jaxpr]]]
 
 
 def _register_elementwise_function(
@@ -259,7 +260,7 @@ def _register_elementwise_function(
   if name in _PRIMITIVE_NAMES:
     raise ValueError(f)
   _PRIMITIVE_NAMES.add(name)
-  p = jax.core.Primitive(name)
+  p = jex.core.Primitive(name)
   p.def_abstract_eval(
       lambda x: jax.core.ShapedArray(x.shape, x.dtype))
   rule = lambda: (jax.make_jaxpr(f)(0.).jaxpr, jax.make_jaxpr(p.bind)(0.).jaxpr)
@@ -298,11 +299,12 @@ _PASS_THRU_PRIMITIVES = frozenset([
     jax.lax.reduce_window_sum_p,
     jax.lax.squeeze_p,
     jax.lax.transpose_p,
+    jex.core.primitives.jit_p,
     # TODO(mstreeter): add more of these
 ])
 
 
-def _rewrite_jaxpr(jaxpr: jax.core.Jaxpr) -> jax.core.Jaxpr:
+def _rewrite_jaxpr(jaxpr: jex.core.Jaxpr) -> jex.core.Jaxpr:
   """Rewrite a Jaxpr to make is suitable for use by taylor_bounds()."""
   for rule_generator in _JAXPR_REWRITE_RULES:
     pattern, replacement = rule_generator()
@@ -328,7 +330,8 @@ class _IntermediateEnclosure:
 
 
 def _broadcast_in_dim_pushforward_fun(intermediate, shape,
-                                      broadcast_dimensions):
+                                      broadcast_dimensions,
+                                      **unused_kwargs):
   """Enclosure-generating function for jax.lax.broadcast_in_dim."""
   enclosure = intermediate.enclosure
   x0 = enclosure[0]
@@ -426,7 +429,7 @@ def _dot_general_pushforward_fun(arithmetic):
 
 def _elementwise_pushforward_fun(arithmetic, get_enclosure):
   f = arithmetic.get_elementwise_fun(get_enclosure)
-  def g(intermediate):
+  def g(intermediate, **unused_kwargs):
     return f(intermediate.enclosure, intermediate.trust_region)
   return g
 
@@ -459,7 +462,7 @@ PushforwardFunction = Callable[
 
 def _pushforward_funs(
     arithmetic: enclosure_arithmetic.TaylorEnclosureArithmetic
-) -> dict[jax.core.Primitive, PushforwardFunction]:
+) -> dict[jex.core.Primitive, PushforwardFunction]:
   """Returns dict from primitive to function that inputs/outputs enclosures."""
   def pushforward_integer_pow(intermediate, y: int):
     return arithmetic.power(intermediate.enclosure, y)
