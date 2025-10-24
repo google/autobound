@@ -15,7 +15,7 @@ keywords = []
 
 # pip dependencies of the project
 dependencies = [
-    "jax>=0.8.0",
+    "jax>=0.4.30",
     "typing_extensions>=4.4.0",
 ]
 
